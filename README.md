@@ -82,18 +82,18 @@ python src/main.py config.json
 
 
 ### 推荐课程
-[第1期 高频交易介绍](https://zhuanlan.zhihu.com/p/94076741)  
-[第2期 一分钟上手，开启自己的第一笔程序化交易](https://zhuanlan.zhihu.com/p/95000601)  
-[第3期 利用REST API拉取行情数据](https://zhuanlan.zhihu.com/p/95282478)  
-[第4期 使用实时行情动态挂单](https://zhuanlan.zhihu.com/p/95829419)  
-[第5期 API报错 & 订单成交](https://zhuanlan.zhihu.com/p/96587726)  
-[第6期 优雅的处理未完成订单](https://zhuanlan.zhihu.com/p/96838420)  
-[第7期 配置文件](https://zhuanlan.zhihu.com/p/96944936)  
-[第8期 日志打印](https://zhuanlan.zhihu.com/p/97009923)  
-[第9期 服务心跳 & 协程任务](https://zhuanlan.zhihu.com/p/97136414)  
-[第10期 Order订单模块](https://zhuanlan.zhihu.com/p/97239035)  
-[第11期 Trade交易模块](https://zhuanlan.zhihu.com/p/97450603)  
-[第12期 并发 & 锁](https://zhuanlan.zhihu.com/p/97704965)  
+[第1期 高频交易介绍](https://www.bilibili.com/video/BV1EJ41197Fx/)  
+[第2期 一分钟上手，开启自己的第一笔程序化交易](https://www.bilibili.com/video/BV1vJ411q799/)  
+[第3期 利用REST API拉取行情数据](https://www.bilibili.com/video/BV15J411B7bG/)  
+[第4期 使用实时行情动态挂单](https://www.bilibili.com/video/BV1JJ411i7hH/)  
+[第5期 API报错 & 订单成交](https://www.bilibili.com/video/BV1nJ411y7zE/)  
+[第6期 优雅的处理未完成订单](https://www.bilibili.com/video/BV1nJ411175f/)  
+[第7期 配置文件](https://www.bilibili.com/video/BV1ZJ411k71z/)  
+[第8期 日志打印](https://www.bilibili.com/video/BV1FJ411C7Ys/)  
+[第9期 服务心跳 & 协程任务](https://www.bilibili.com/video/BV1pJ411C7dS/)  
+[第10期 Order订单模块](https://www.bilibili.com/video/BV1UJ411C7a6/)  
+[第11期 Trade交易模块](https://www.bilibili.com/video/BV1sJ411r73X/)  
+[第12期 并发 & 锁](https://www.bilibili.com/video/BV1iJ411677Q/)  
 [第13期 Market行情模块 & 行情服务器](https://www.bilibili.com/video/av79695611/)  
 [第14期 Position合约持仓模块](https://www.bilibili.com/video/av84079197/)  
 [第15期 现货搬砖套利原理](https://www.bilibili.com/video/av86045742/)  
@@ -108,6 +108,9 @@ python src/main.py config.json
 [第24期 Market行情系统升级](https://www.bilibili.com/video/BV1rk4y1R7gk/)  
 [第25期 现货-合约无风险套利](https://www.bilibili.com/video/BV15A411b78b/)  
 [第26期 合约的无风险套利](https://www.bilibili.com/video/BV1AK4y1k7un/)  
+[第27期 高阶技巧 - 运行时更新](https://www.bilibili.com/video/BV1Xe411p7Pm/)  
+[第28期 Triangular Arbitrage 三角套利原理](https://www.bilibili.com/video/BV1WZ4y1W77F/)  
+[第29期 Triangular Arbitrage 三角套利策略编写](https://www.bilibili.com/video/BV1zz411i7xW/)  
 
 
 ### 有任何问题，欢迎联系
