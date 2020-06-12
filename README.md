@@ -111,6 +111,7 @@ python src/main.py config.json
 [第27期 高阶技巧 - 运行时更新](https://www.bilibili.com/video/BV1Xe411p7Pm/)  
 [第28期 Triangular Arbitrage 三角套利原理](https://www.bilibili.com/video/BV1WZ4y1W77F/)  
 [第29期 Triangular Arbitrage 三角套利策略编写](https://www.bilibili.com/video/BV1zz411i7xW/)  
+[第30期 高效的交易方式](https://www.bilibili.com/video/BV1Ai4y1x7Z3/)  
 
 
 ### 有任何问题，欢迎联系
