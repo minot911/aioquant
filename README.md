@@ -113,6 +113,7 @@ python src/main.py config.json
 [第29期 Triangular Arbitrage 三角套利策略编写](https://www.bilibili.com/video/BV1zz411i7xW/)  
 [第30期 高效的交易方式](https://www.bilibili.com/video/BV1Ai4y1x7Z3/)  
 [第31期 高阶技巧 - ClientOrderId的用法](https://www.bilibili.com/video/BV1dA411v72d/)  
+[第32期 高阶技巧 - 订单类型的高级用法](https://www.bilibili.com/video/BV12K411n7GC/)  
 
 
 ### 有任何问题，欢迎联系
