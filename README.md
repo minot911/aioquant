@@ -115,6 +115,8 @@ python src/main.py config.json
 [第31期 高阶技巧 - ClientOrderId的用法](https://www.bilibili.com/video/BV1dA411v72d/)  
 [第32期 高阶技巧 - 订单类型的高级用法](https://www.bilibili.com/video/BV12K411n7GC/)  
 [第33期 Trade模块的强大功能让你的策略如虎添翼](https://www.bilibili.com/video/BV1WZ4y1u7KF)  
+[第34期 AIOQuant到底有何不同？](https://www.bilibili.com/video/BV17t4y1X74P/)  
+[第35期 搭建本地量化策略研发环境](https://www.bilibili.com/video/BV1w54y1B7ZH/)  
 
 
 ### 有任何问题，欢迎联系
