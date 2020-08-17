@@ -2,18 +2,32 @@
     "RABBITMQ": {
         "host": "127.0.0.1",
         "port": 5672,
-        "username": "test",
-        "password": "123456"
+        "username": "guest",
+        "password": "guest"
     },
-    "PROXY": "http://127.0.0.1:1087",
+    
     "ACCOUNTS": [
         {
-            "platform": "binance",
-            "account": "abc123@gmail.com",
-            "access_key": "ACCESS KEY",
-            "secret_key": "SECRET KEY"
+            "platform": "huobi",
+            "account": "abc123",
+            "access_key": "xxx-xxxx-xxx-xxx",
+            "secret_key": "xxx-xxx-xxxx-xxx"
+
         }
     ],
+    "MARKETS": {
+        "huobi": [
+            {"symbols": "BTC/USDT",            
+            "channels": "orderbook",
+            "orderbook_length":1
+            },
+            {"symbols": "EOS/USDT",            
+                "channels": "orderbook",
+                "orderbook_length":1
+            }
+        ]
+
+    },
     "strategy": "my_test_strategy",
     "symbol": "ETH/BTC"
 }
