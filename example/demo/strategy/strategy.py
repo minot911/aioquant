@@ -19,7 +19,7 @@ class MyStrategy:
         """ 初始化
         """
         self.strategy = "my_strategy"
-        self.platform = BINANCE
+        self.platform = config.accounts[0]["platform"]
         self.account = config.accounts[0]["account"]
         self.access_key = config.accounts[0]["access_key"]
         self.secret_key = config.accounts[0]["secret_key"]
@@ -41,37 +41,39 @@ class MyStrategy:
         self.trader = Trade(**cc)
 
         # 订阅行情
-        Market(const.MARKET_TYPE_ORDERBOOK, const.BINANCE, self.symbol, self.on_event_orderbook_update)
+
+        Market(const.MARKET_TYPE_ORDERBOOK, self.platform, "BTC/USDT", self.on_event_orderbook_update)
+        Market(const.MARKET_TYPE_ORDERBOOK, self.platform, "EOS/USDT", self.on_event_orderbook_update)
 
     async def on_event_orderbook_update(self, orderbook: Orderbook):
         """ 订单薄更新
         """
-        logger.debug("orderbook:", orderbook, caller=self)
+        logger.debug("orderbook_recived:", orderbook, caller=self)
         bid3_price = orderbook.bids[2][0]  # 买三价格
         bid4_price = orderbook.bids[3][0]  # 买四价格
+        
+        # # 判断是否需要撤单
+        # if self.order_id:
+        #     if float(self.create_order_price) < float(bid3_price) or float(self.create_order_price) > float(bid4_price):
+        #         return
+        #     _, error = await self.trader.revoke_order(self.order_id)
+        #     if error:
+        #         logger.error("revoke order error! error:", error, caller=self)
+        #         return
+        #     self.order_id = None
+        #     logger.info("revoke order:", self.order_id, caller=self)
 
-        # 判断是否需要撤单
-        if self.order_id:
-            if float(self.create_order_price) < float(bid3_price) or float(self.create_order_price) > float(bid4_price):
-                return
-            _, error = await self.trader.revoke_order(self.order_id)
-            if error:
-                logger.error("revoke order error! error:", error, caller=self)
-                return
-            self.order_id = None
-            logger.info("revoke order:", self.order_id, caller=self)
-
-        # 创建新订单
-        price = (float(bid3_price) + float(bid4_price)) / 2
-        quantity = "0.1"  # 假设委托数量为0.1
-        action = ORDER_ACTION_BUY
-        order_id, error = await self.trader.create_order(action, price, quantity)
-        if error:
-            logger.error("create order error! error:", error, caller=self)
-            return
-        self.order_id = order_id
-        self.create_order_price = price
-        logger.info("create new order:", order_id, caller=self)
+        # # 创建新订单
+        # price = (float(bid3_price) + float(bid4_price)) / 2
+        # quantity = "0.1"  # 假设委托数量为0.1
+        # action = ORDER_ACTION_BUY
+        # order_id, error = await self.trader.create_order(action, price, quantity)
+        # if error:
+        #     logger.error("create order error! error:", error, caller=self)
+        #     return
+        # self.order_id = order_id
+        # self.create_order_price = price
+        # logger.info("create new order:", order_id, caller=self)
 
     async def on_event_order_update(self, order: Order):
         """ 订单状态更新

@@ -30,7 +30,8 @@ from aioquant.order import ORDER_ACTION_BUY, ORDER_ACTION_SELL
 from aioquant.order import ORDER_TYPE_LIMIT, ORDER_TYPE_MARKET
 from aioquant.order import ORDER_STATUS_SUBMITTED, ORDER_STATUS_PARTIAL_FILLED, ORDER_STATUS_FILLED, \
     ORDER_STATUS_CANCELED, ORDER_STATUS_FAILED
-
+from aioquant.market import Orderbook, Trade, Kline
+from aioquant.configure import config
 
 __all__ = ("HuobiRestAPI", "HuobiTrade", )
 
@@ -398,12 +399,15 @@ class HuobiTrade:
         self._order_channel = "orders.{}".format(self._raw_symbol)
         self._assets = {}
         self._orders = {}
-
+        self.markets = config.markets
         # Initialize our REST API client.
         self._rest_api = HuobiRestAPI(self._access_key, self._secret_key, self._host, )
 
         url = self._wss + "/ws/v1"
         self._ws = Websocket(url, self.connected_callback, process_binary_callback=self.process_binary)
+        market_url = self._wss + "/ws"
+        self._ws_market = Websocket(market_url, self.markt_connected_callback, process_binary_callback=self.market_process_binary)
+
 
     @property
     def orders(self):
@@ -412,6 +416,24 @@ class HuobiTrade:
     @property
     def rest_api(self):
         return self._rest_api
+    async def markt_connected_callback(self):
+        if "huobi" not in self.markets:
+            return        
+        for i in self.markets["huobi"]:
+            symbols = i["symbols"].replace("/", "").lower()  
+            if i["channels"] == "orderbook":
+                subtopic = "market.{}.depth.step{}".format(symbols,i["orderbook_length"])
+            if i["channels"] == "trade":
+                subtopic = "market.{}.trade.detail".format(symbols)
+            if i["channels"] == "kline":
+                subtopic = "market.{}.depth.{}min".format(symbols,i["orderbook_length"])
+            if subtopic != None:
+                idnum ="{}".format(i["symbols"])
+                marketparams = {
+                    "sub": subtopic,
+                    "id": idnum
+                }
+                await self._ws_market.send(marketparams)        
 
     async def connected_callback(self):
         """After websocket connection created successfully, we will send a message to server for authentication."""
@@ -454,7 +476,38 @@ class HuobiTrade:
             "op": "sub",
             "topic": self._order_channel
         }
-        await self._ws.send(params)
+        await self._ws.send(params)      
+    @async_method_locker("HuobiTrade.market_process_binary.locker")
+    async def market_process_binary(self, raw):
+        """Process binary message that received from websocket.
+
+        Args:
+            raw: Binary message received from websocket.
+
+        Returns:
+            None.
+        """
+        msg = json.loads(gzip.decompress(raw).decode())
+    
+        if 'ping' in msg:
+            params = {
+                "pong": msg["ping"]                
+            }
+            await self._ws_market.send(params)
+            return
+        if "ch" in msg and msg["ch"].split('.')[-2] == "depth":
+            asks = msg["tick"]["asks"]
+            bids = msg["tick"]["bids"]
+            timestamp = msg["ts"]
+            for i in self.markets["huobi"]:                
+                if i["symbols"].replace("/", "").lower() == msg["ch"].split('.')[-3]:
+                    symbols = i["symbols"]
+                    break
+            from aioquant.event import EventOrderbook
+            EventOrderbook(Orderbook(self._platform, symbols, asks, bids, timestamp)).publish()
+        else :
+            logger.debug("msg:", msg, caller=self)
+
 
     @async_method_locker("HuobiTrade.process_binary.locker")
     async def process_binary(self, raw):
