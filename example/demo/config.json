@@ -8,8 +8,9 @@
     
     "ACCOUNTS": [
         {
-            "platform": "huobi",
+            "platform": "okex",
             "account": "abc123",
+	    "passphrase": "xxxxxx",
             "access_key": "xxx-xxxx-xxx-xxx",
             "secret_key": "xxx-xxx-xxxx-xxx"
 
@@ -17,6 +18,16 @@
     ],
     "MARKETS": {
         "huobi": [
+            {"symbols": "BTC/USDT",            
+            "channels": "orderbook",
+            "orderbook_length":1
+            },
+            {"symbols": "EOS/USDT",            
+                "channels": "orderbook",
+                "orderbook_length":1
+            }
+        ],
+	"okex": [
             {"symbols": "BTC/USDT",            
             "channels": "orderbook",
             "orderbook_length":1

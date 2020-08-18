@@ -28,7 +28,8 @@ from aioquant.order import ORDER_ACTION_BUY, ORDER_ACTION_SELL
 from aioquant.order import ORDER_TYPE_LIMIT, ORDER_TYPE_MARKET
 from aioquant.order import ORDER_STATUS_SUBMITTED, ORDER_STATUS_PARTIAL_FILLED, ORDER_STATUS_FILLED, \
     ORDER_STATUS_CANCELED, ORDER_STATUS_FAILED
-
+from aioquant.market import Orderbook, Trade, Kline
+from aioquant.configure import config
 
 __all__ = ("OKExRestAPI", "OKExTrade", )
 
@@ -392,7 +393,7 @@ class OKExTrade:
 
         self._assets = {}  # Asset object. e.g. {"BTC": {"free": "1.1", "locked": "2.2", "total": "3.3"}, ... }
         self._orders = {}  # Order objects. e.g. {"order_id": Order, ... }
-
+        self.markets = config.markets
         # Initializing our REST API client.
         self._rest_api = OKExRestAPI(self._access_key, self._secret_key, self._passphrase, self._host)
 
@@ -419,7 +420,16 @@ class OKExTrade:
             "args": [self._access_key, self._passphrase, timestamp, signature]
         }
         await self._ws.send(data)
-
+        if "okex" not in self.markets:
+            return        
+        for i in self.markets["okex"]:
+            symbols = i["symbols"].replace("/", "-")
+            market_channal = "spot/depth5:{}".format(symbols)
+            data1 = {
+                "op": "subscribe",
+                "args": [market_channal]
+            }
+            await self._ws.send(data1)
     async def _send_heartbeat_msg(self, *args, **kwargs):
         """Send ping to server."""
         hb = "ping"
@@ -441,7 +451,7 @@ class OKExTrade:
         msg = msg.decode()
         if msg == "pong":
             return
-        logger.debug("msg:", msg, caller=self)
+        #logger.debug("msg:", msg, caller=self)
         msg = json.loads(msg)
 
         # Authorization message received.
@@ -475,7 +485,7 @@ class OKExTrade:
                 "args": [self._order_channel]
             }
             await self._ws.send(data)
-            return
+            return      
 
         # Subscribe response message received.
         if msg.get("event") == "subscribe":
@@ -493,6 +503,15 @@ class OKExTrade:
                 data["ctime"] = data["timestamp"]
                 data["utime"] = data["last_fill_time"]
                 self._update_order(data)
+        if msg.get("table") == "spot/depth5":                      
+            asks = msg["data"][0]["asks"]
+            bids = msg["data"][0]["bids"]
+            timestamp = msg["data"][0]["timestamp"]
+            symbols = msg["data"][0]["instrument_id"].replace("-", "/")
+            from aioquant.event import EventOrderbook
+            EventOrderbook(Orderbook(self._platform, symbols, asks, bids, timestamp)).publish()
+        else :
+            logger.debug("msg:", msg, caller=self)   
 
     async def create_order(self, action, price, quantity, *args, **kwargs):
         """Create an order.

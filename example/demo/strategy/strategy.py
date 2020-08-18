@@ -24,7 +24,7 @@ class MyStrategy:
         self.access_key = config.accounts[0]["access_key"]
         self.secret_key = config.accounts[0]["secret_key"]
         self.symbol = config.symbol
-
+        self.passphrase = config.accounts[0]["passphrase"]
         self.order_id = None  # 创建订单的id
         self.create_order_price = "0.0"  # 创建订单的价格
 
@@ -36,6 +36,7 @@ class MyStrategy:
             "account": self.account,
             "access_key": self.access_key,
             "secret_key": self.secret_key,
+            "passphrase": self.passphrase,
             "order_update_callback": self.on_event_order_update,
         }
         self.trader = Trade(**cc)
