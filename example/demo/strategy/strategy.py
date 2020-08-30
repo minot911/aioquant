@@ -43,8 +43,8 @@ class MyStrategy:
 
         # 订阅行情
 
-        Market(const.MARKET_TYPE_ORDERBOOK, self.platform, "BTC/USDT", self.on_event_orderbook_update)
-        Market(const.MARKET_TYPE_ORDERBOOK, self.platform, "EOS/USDT", self.on_event_orderbook_update)
+        Market(const.MARKET_TYPE_ORDERBOOK, self.platform, "btcusdt", self.on_event_orderbook_update)
+        Market(const.MARKET_TYPE_ORDERBOOK, self.platform, "eosusdt", self.on_event_orderbook_update)
 
     async def on_event_orderbook_update(self, orderbook: Orderbook):
         """ 订单薄更新

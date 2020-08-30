@@ -76,6 +76,8 @@ class Trade:
             from aioquant.platform.huobi import HuobiTrade as T
         elif platform == const.OKEX:
             from aioquant.platform.okex import OKExTrade as T
+        elif platform == const.ZB:
+            from aioquant.platform.zb import ZbTrade as T   
         else:
             logger.error("platform error:", platform, caller=self)
             e = Error("platform error")

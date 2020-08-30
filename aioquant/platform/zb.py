@@ -406,7 +406,7 @@ class ZbTrade:
         if not kwargs.get("host"):
             kwargs["host"] = "https://api.zb.live"
         if not kwargs.get("wss"):
-            kwargs["wss"] = "wss://api.zb.com:9999/websocket"
+            kwargs["wss"] = "wss://api.zb.live/websocket"
         if not kwargs.get("access_key"):
             e = Error("param access_key miss")
         if not kwargs.get("secret_key"):
@@ -438,7 +438,7 @@ class ZbTrade:
         self._rest_api = ZbRestAPI(self._access_key, self._secret_key, self._host, )
 
         url = self._wss 
-        self._ws = Websocket(url, self.connected_callback, process_binary_callback=self.process_binary)
+        self._ws = Websocket(url, self.connected_callback, process_binary_callback=self.process_binary, process_callback=self.process_callback)
 
     @property
     def orders(self):
@@ -448,16 +448,17 @@ class ZbTrade:
     def rest_api(self):
         return self._rest_api
     async def markt_connected_callback(self):
-        if "Zb" not in self.markets:
-            return        
-        for i in self.markets["Zb"]:
+        if "zb" not in self.markets:
+            return
+        print(self._ws.ws)        
+        for i in self.markets["zb"]:
             symbols = i["symbols"].replace("/", "").lower()  
             if i["channels"] == "orderbook":
-                req = "{'event':'addChannel','channel':'{}_depth'}".format(symbols)                      
+                req = "{'event':'addChannel','channel':'%s_depth'}" % symbols                      
             if i["channels"] == "trade":
-                req = "{'event':'addChannel','channel':'{}_trades'}".format(symbols)
+                req = "{'event':'addChannel','channel':'%s_trades'}" % symbols  
             if i["channels"] == "kline":
-                 req = "{'event':'addChannel','channel':'{}_ticker'}".format(symbols)
+                 req = "{'event':'addChannel','channel':'%s_ticker'}" % symbols  
             if req:
                 await self._ws.send(req)        
 
@@ -473,7 +474,8 @@ class ZbTrade:
         signature = self._rest_api.generate_signature("GET")
         params["op"] = "auth"
         params["Signature"] = signature
-        await self._ws.send(params)
+       # await self._ws.send(params)
+        await self.markt_connected_callback()
 
     async def _auth_success_callback(self):
         # Get current open orders.
@@ -503,6 +505,19 @@ class ZbTrade:
             "topic": self._order_channel
         }
         await self._ws.send(params)      
+    async def process_callback(self, raw):
+        msg=raw        
+        #logger.debug("msg:", msg, caller=self)
+
+        channel = msg.get("channel")
+        type = channel.split('_')
+        if type[-1] == "depth":
+            asks = msg["asks"]
+            bids = msg["bids"]
+            timestamp = msg["timestamp"]
+            symbols = type[-2]
+            from aioquant.event import EventOrderbook
+            EventOrderbook(Orderbook(self._platform, symbols, asks, bids, timestamp)).publish()
    
     @async_method_locker("ZbTrade.process_binary.locker")
     async def process_binary(self, raw):
@@ -514,7 +529,7 @@ class ZbTrade:
         Returns:
             None.
         """
-        msg = json.loads(gzip.decompress(raw).decode())
+        msg = json.loads(raw)
         logger.debug("msg:", msg, caller=self)
 
         op = msg.get("op")

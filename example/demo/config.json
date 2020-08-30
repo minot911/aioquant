@@ -8,7 +8,7 @@
     
     "ACCOUNTS": [
         {
-            "platform": "okex",
+            "platform": "zb",
             "account": "abc123",
 	    "passphrase": "xxxxxx",
             "access_key": "xxx-xxxx-xxx-xxx",
@@ -27,7 +27,7 @@
                 "orderbook_length":1
             }
         ],
-	"okex": [
+	"zb": [
             {"symbols": "BTC/USDT",            
             "channels": "orderbook",
             "orderbook_length":1
