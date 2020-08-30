@@ -33,6 +33,7 @@ OKEX = "okex"  # OKEx SPOT https://www.okex.me/spot/trade
 OKEX_MARGIN = "okex_margin"  # OKEx MARGIN https://www.okex.me/spot/marginTrade
 OKEX_FUTURE = "okex_future"  # OKEx FUTURE https://www.okex.me/future/trade
 OKEX_SWAP = "okex_swap"  # OKEx SWAP https://www.okex.me/future/swap
+ZB = "zb"  # https://www.zb.live
 
 
 # Market Types
