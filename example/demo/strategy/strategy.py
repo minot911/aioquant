@@ -11,6 +11,7 @@ from aioquant.const import BINANCE
 from aioquant.order import Order
 from aioquant.market import Orderbook
 from aioquant.order import ORDER_ACTION_BUY, ORDER_STATUS_FAILED, ORDER_STATUS_CANCELED, ORDER_STATUS_FILLED
+from aioquant.utils.decorator import async_method_locker
 
 
 class MyStrategy:
@@ -23,11 +24,11 @@ class MyStrategy:
         self.account = config.accounts[0]["account"]
         self.access_key = config.accounts[0]["access_key"]
         self.secret_key = config.accounts[0]["secret_key"]
-        self.symbol = config.symbol
+        self.symbol = "EOS/QC"
         self.passphrase = config.accounts[0]["passphrase"]
         self.order_id = None  # 创建订单的id
         self.create_order_price = "0.0"  # 创建订单的价格
-
+        self.rawsymbol = self.symbol.replace("/","").lower()
         # 交易模块
         cc = {
             "strategy": self.strategy,
@@ -38,43 +39,52 @@ class MyStrategy:
             "secret_key": self.secret_key,
             "passphrase": self.passphrase,
             "order_update_callback": self.on_event_order_update,
+            "init_callback": self.on_init_callback,
         }
         self.trader = Trade(**cc)
 
-        # 订阅行情
+        #请求行情
+        #self.trader._t.request_market_by_websocket("orderbook")    
+        # 订阅行情 
+        Market(const.MARKET_TYPE_ORDERBOOK, self.platform, self.rawsymbol, self.on_event_orderbook_update)
 
-        Market(const.MARKET_TYPE_ORDERBOOK, self.platform, "btcusdt", self.on_event_orderbook_update)
-        Market(const.MARKET_TYPE_ORDERBOOK, self.platform, "eosusdt", self.on_event_orderbook_update)
-
+    @async_method_locker("MyStrategy.init_callback.locker")  
+    async def on_init_callback(self, success: bool, **kwagrs):
+        if success == True:
+            await self.trader.marketreqweb(const.MARKET_TYPE_ORDERBOOK)
+            return
+        logger.debug("inint err:", success, caller=self)  
+    
+    
+    @async_method_locker("MyStrategy.on_event_orderbook_update.locker")  
     async def on_event_orderbook_update(self, orderbook: Orderbook):
         """ 订单薄更新
         """
         logger.debug("orderbook_recived:", orderbook, caller=self)
-        bid3_price = orderbook.bids[2][0]  # 买三价格
-        bid4_price = orderbook.bids[3][0]  # 买四价格
+        bid3_price = orderbook.bids[3][0]  # 买三价格
+        bid4_price = orderbook.bids[4][0]  # 买四价格
         
-        # # 判断是否需要撤单
-        # if self.order_id:
-        #     if float(self.create_order_price) < float(bid3_price) or float(self.create_order_price) > float(bid4_price):
-        #         return
-        #     _, error = await self.trader.revoke_order(self.order_id)
-        #     if error:
-        #         logger.error("revoke order error! error:", error, caller=self)
-        #         return
-        #     self.order_id = None
-        #     logger.info("revoke order:", self.order_id, caller=self)
-
-        # # 创建新订单
-        # price = (float(bid3_price) + float(bid4_price)) / 2
-        # quantity = "0.1"  # 假设委托数量为0.1
-        # action = ORDER_ACTION_BUY
-        # order_id, error = await self.trader.create_order(action, price, quantity)
-        # if error:
-        #     logger.error("create order error! error:", error, caller=self)
-        #     return
-        # self.order_id = order_id
-        # self.create_order_price = price
-        # logger.info("create new order:", order_id, caller=self)
+        # 判断是否需要撤单
+        if self.order_id:
+             if float(self.create_order_price) > float(bid3_price) or float(self.create_order_price) < float(bid4_price):
+                 return
+             _, error = await self.trader.revoke_order(self.order_id)
+             if error:
+                 logger.error("revoke order error! error:", error, caller=self)
+                 return
+             self.order_id = None             
+        else:
+            # # 创建新订单
+            price = (float(bid3_price) + float(bid4_price)) /2.0
+            quantity = "3.0"  # 假设委托数量为0.1
+            action = ORDER_ACTION_BUY
+            order_id, error = await self.trader.create_order(action, price, quantity)
+            if error:
+                logger.error("create order error! error:", error, caller=self)
+                return
+            self.order_id = order_id
+            self.create_order_price = price
+            logger.info("create new order:", order_id, caller=self)
 
     async def on_event_order_update(self, order: Order):
         """ 订单状态更新

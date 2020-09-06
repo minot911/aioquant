@@ -182,7 +182,7 @@ class Trade:
             "symbol": self._raw_params["symbol"],
             "account": self._raw_params["account"]
         }
-        await self._init_callback(success, **params)
+        await self._init_callback(success, **params) 
 
     async def _on_error_callback(self, error: Error) -> None:
         """Callback function when some error occur while Trade module is running.
@@ -199,3 +199,15 @@ class Trade:
             "account": self._raw_params["account"]
         }
         await self._error_callback(error, **params)
+    
+    async def marketreqweb(self,typechannel):
+        """req market data .
+
+        Args:
+            typechannel: "trade", "orderbook",  "kline" 
+
+        No Returns:
+            success: If execute successfully, return success information, otherwise it's None.
+            error: If execute failed, return error information, otherwise it's None.
+        """
+        await self._t.request_market_by_websocket(typechannel)        

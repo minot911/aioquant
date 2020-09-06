@@ -235,7 +235,7 @@ class Market:
         else:
             multi = False
         if market_type == const.MARKET_TYPE_ORDERBOOK:
-            from aioquant.event import EventOrderbook
+            from aioquant.event import EventOrderbook            
             EventOrderbook(Orderbook(platform, symbol)).subscribe(callback, multi)
         elif market_type == const.MARKET_TYPE_TRADE:
             from aioquant.event import EventTrade

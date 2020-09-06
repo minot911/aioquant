@@ -10,9 +10,9 @@
         {
             "platform": "zb",
             "account": "abc123",
-	    "passphrase": "xxxxxx",
-            "access_key": "xxx-xxxx-xxx-xxx",
-            "secret_key": "xxx-xxx-xxxx-xxx"
+	        "passphrase": "xxxxxx",
+            "access_key": "f217f62e-4203-4c9d-a146-49724b2b3a19",
+            "secret_key": "adb3fa71-5139-4015-b96e-6b2472784161"
 
         }
     ],
@@ -40,5 +40,5 @@
 
     },
     "strategy": "my_test_strategy",
-    "symbol": "ETH/BTC"
+    "symbol": "ETH/USDT"
 }

@@ -20,7 +20,6 @@ import datetime,time
 import struct
 from urllib import parse
 from urllib.parse import urljoin
-
 from aioquant.error import Error
 from aioquant.utils import logger
 from aioquant.order import Order
@@ -80,7 +79,7 @@ class ZbRestAPI:
         Note:
             When type is set to `step0`, the default value of `depth` is 150 instead of 20.
         """
-        symbol=symbol.replace("/", "-").lower
+        symbol=symbol.replace("/", "-").lower()
         uri = "/data/v1/depth?market={symbol}&size={depth}".format(symbol=symbol,depth=depth)
         success, error = await self.request("GET", uri)
         return success, error
@@ -115,7 +114,7 @@ class ZbRestAPI:
         Notes:
             If start and end are not sent, the most recent klines are returned.
         """
-        symbol=symbol.replace("/", "-").lower
+        symbol=symbol.replace("/", "-").lower()
         uri = "/data/v1/kline?market={}".format(symbol)      
         success, error = await self.request("GET", uri)
         return success, error
@@ -146,11 +145,11 @@ class ZbRestAPI:
             error: Error information, otherwise it's None.
         """
         uri = "/api/getAccountInfo"
-        params = {
+        info = {
             "accesskey" : self._access_key,
             "method": "getAccountInfo"
         }
-        success, error = await self.request("GET", uri, auth=True)
+        success, error = await self.request("GET", uri, params=info, auth=True)
         return success, error
 
     async def get_balance_all(self):
@@ -185,26 +184,26 @@ class ZbRestAPI:
             error: Error information, otherwise it's None.
         """
         uri = "/api/order"
-        if order_type == "buy":
+        if order_type == "buy-limit":
             tradeType = 1
-        else:
+        elif order_type == "sell-limit":
             tradeType = 0
+        else:
+            logger.debug("orderTpye err:", order_type, caller=self)
+            return None, False
         info = {
-            "accesskey": account_id,
+            "accesskey": self._access_key,
             "acctType": 0,
             "amount": quantity,
-            "currency": "api",
-            "symbol": symbol.replace('/','_').lower,
+            "currency": symbol.replace('/','_').lower(),
             "method": "order",
             "price": price,
             "tradeType": tradeType
         }
-        if client_order_id:
-            info["client-order-id"] = client_order_id
-        success, error = await self.request("POST", uri, body=info, auth=True)
+        success, error = await self.request("POST", uri, params=info, auth=True)
         return success, error
 
-    async def revoke_order(self, order_id, symbol=None):
+    async def revoke_order(self, symbol, order_id):
         """Cancelling an unfilled order.
            GET https://trade.zb.live/api/cancelOrder?accesskey=youraccesskey&currency=zb_qc&id=201710111625
                 &method=cancelOrder&sign=请求加密签名串&reqTime=当前时间毫秒数
@@ -219,11 +218,11 @@ class ZbRestAPI:
         uri = "/api/cancelOrder"
         params = {
             "accesskey" : self._access_key,
-            "currency": symbol.replace('/','_').lower,
+            "currency": symbol.replace('/','_').lower(),
             "method": "cancelOrder",
             "id": order_id
         }
-        success, error = await self.request("POST", uri, auth=True)
+        success, error = await self.request("POST", uri, params=params, auth=True)
         return success, error
 
     async def get_open_orders(self, symbol, limit=50):
@@ -231,6 +230,7 @@ class ZbRestAPI:
         GET https://trade.zb.live/api/getUnfinishedOrdersIgnoreTradeType?accesskey=youraccesskey
             &currency=zb_qc&method=getUnfinishedOrdersIgnoreTradeType&pageIndex=1&pageSize=10
             &sign=请求加密签名串&reqTime=当前时间毫秒数
+            
         Args:
             symbol: Symbol name, e.g. `ethusdt`.
             limit: The number of orders to return, [1, 500].
@@ -243,7 +243,7 @@ class ZbRestAPI:
         
         params = {
             "accesskey": self._access_key,
-            "currency": symbol.replace('/','_').lower,
+            "currency": symbol.replace('/','_').lower(),
             "method": "getUnfinishedOrdersIgnoreTradeType",
             "pageIndex": 1,
             "pageSize": limit
@@ -266,7 +266,7 @@ class ZbRestAPI:
         
         params = {
             "accesskey": self._access_key,
-            "currency": symbol.replace('/','_').lower,
+            "currency": symbol.replace('/','_').lower(),
             "method": "getOrder",
             "id": order_id            
         }
@@ -321,9 +321,7 @@ class ZbRestAPI:
         if error:
             return success, error
         if not isinstance(success, dict):
-            success = json.loads(success)
-        if success.get("status") != "ok":
-            return None, success
+            success = json.loads(success) 
         return success, None
 
     def generate_signature(self,params):
@@ -429,8 +427,7 @@ class ZbTrade:
         self._order_update_callback = kwargs.get("order_update_callback")
         self._init_callback = kwargs.get("init_callback")
 
-        self._raw_symbol = self._symbol.replace("/", "").lower()
-        self._order_channel = "orders.{}".format(self._raw_symbol)
+        self._raw_symbol = self._symbol.replace("/", "").lower() 
         self._assets = {}
         self._orders = {}
         self.markets = config.markets
@@ -447,20 +444,18 @@ class ZbTrade:
     @property
     def rest_api(self):
         return self._rest_api
-    async def markt_connected_callback(self):
-        if "zb" not in self.markets:
-            return
-        print(self._ws.ws)        
-        for i in self.markets["zb"]:
-            symbols = i["symbols"].replace("/", "").lower()  
-            if i["channels"] == "orderbook":
-                req = "{'event':'addChannel','channel':'%s_depth'}" % symbols                      
-            if i["channels"] == "trade":
-                req = "{'event':'addChannel','channel':'%s_trades'}" % symbols  
-            if i["channels"] == "kline":
-                 req = "{'event':'addChannel','channel':'%s_ticker'}" % symbols  
-            if req:
-                await self._ws.send(req)        
+
+    async def request_market_by_websocket(self, channelType):         
+        if channelType == "orderbook":
+            req = "{'event':'addChannel','channel':'%s_depth'}" % self._raw_symbol                    
+        if channelType == "trade":
+            req = "{'event':'addChannel','channel':'%s_trades'}" % self._raw_symbol  
+        if channelType == "kline":
+            req = "{'event':'addChannel','channel':'%s_ticker'}" % self._raw_symbol        
+        await self._ws.send(req)
+        logger.debug("req:", req, caller=self)
+        return True, None
+ 
 
     async def connected_callback(self):
         """After websocket connection created successfully, we will send a message to server for authentication."""
@@ -474,37 +469,17 @@ class ZbTrade:
         signature = self._rest_api.generate_signature("GET")
         params["op"] = "auth"
         params["Signature"] = signature
+        #req = "{'event':'addChannel','channel':'%s_depth'}" % self._raw_symbol
+        #await self._ws.send(req)
+        #logger.debug("req:", req, caller=self)  
+        SingleTask.run(self._init_callback, True)
        # await self._ws.send(params)
-        await self.markt_connected_callback()
+       # await self.markt_connected_callback()
 
     async def _auth_success_callback(self):
         # Get current open orders.
-        success, error = await self._rest_api.get_open_orders(self._raw_symbol)
-        if error:
-            e = Error("get open orders error: {}".format(error))
-            SingleTask.run(self._error_callback, e)
-            SingleTask.run(self._init_callback, False)
-            return
-        for order_info in success["data"]:
-            data = {
-                "order-id": order_info["id"],
-                "order-type": order_info["type"],
-                "order-state": order_info["state"],
-                "unfilled-amount": float(order_info["amount"]) - float(order_info["filled-amount"]),
-                "order-price": float(order_info["price"]),
-                "price": float(order_info["price"]),
-                "order-amount": float(order_info["amount"]),
-                "created-at": order_info["created-at"],
-                "utime": order_info["created-at"],
-            }
-            self._update_order(data)
-
-        # Subscript order channel.
-        params = {
-            "op": "sub",
-            "topic": self._order_channel
-        }
-        await self._ws.send(params)      
+        pass
+    @async_method_locker("ZbTrade.process_callback.locker")      
     async def process_callback(self, raw):
         msg=raw        
         #logger.debug("msg:", msg, caller=self)
@@ -529,41 +504,7 @@ class ZbTrade:
         Returns:
             None.
         """
-        msg = json.loads(raw)
-        logger.debug("msg:", msg, caller=self)
-
-        op = msg.get("op")
-
-        if op == "auth":
-            if msg["err-code"] != 0:
-                e = Error("Websocket connection authorized failed: {}".format(msg))
-                logger.error(e, caller=self)
-                SingleTask.run(self._error_callback, e)
-                SingleTask.run(self._init_callback, False)
-                return
-            logger.info("Websocket connection authorized successfully.", caller=self)
-            await self._auth_success_callback()
-        elif op == "ping":  # ping
-            params = {
-                "op": "pong",
-                "ts": msg["ts"]
-            }
-            await self._ws.send(params)
-        elif op == "sub":
-            if msg["topic"] != self._order_channel:
-                return
-            if msg["err-code"] != 0:
-                e = Error("subscribe order event error: {}".format(msg))
-                SingleTask.run(self._error_callback, e)
-                SingleTask.run(self._init_callback, False)
-            else:
-                SingleTask.run(self._init_callback, True)
-        elif op == "notify":
-            if msg["topic"] != self._order_channel:
-                return
-            data = msg["data"]
-            data["utime"] = msg["ts"]
-            self._update_order(data)
+        pass
 
     async def create_order(self, action, price, quantity, *args, **kwargs):
         """Create an order.
@@ -607,11 +548,11 @@ class ZbTrade:
             logger.error(e, caller=self)
             SingleTask.run(self._error_callback, e)
             return None, "action error"
-        result, error = await self._rest_api.create_order(self._raw_symbol, price, quantity, t, client_order_id)
+        result, error = await self._rest_api.create_order(self._symbol, price, quantity, t, client_order_id)
         if error:
             SingleTask.run(self._error_callback, error)
             return None, error
-        order_id = result["data"]
+        order_id = result["id"]
         return order_id, None
 
     async def revoke_order(self, *order_ids):
@@ -630,28 +571,20 @@ class ZbTrade:
         """
         # If len(order_ids) == 0, you will cancel all orders for this symbol(initialized in Trade object).
         if len(order_ids) == 0:
-            success, error = await self._rest_api.get_open_orders(self._raw_symbol)
+            order_infos, error = await self._rest_api.get_open_orders(self._symbol)
             if error:
                 SingleTask.run(self._error_callback, error)
                 return False, error
-            order_infos = success["data"]
-            if len(order_infos) > 100:
-                logger.warn("order length too long! (more than 100)", caller=self)
-            order_ids = []
             for order_info in order_infos:
-                order_id = str(order_info["id"])
-                order_ids.append(order_id)
-            if not order_ids:
-                return True, None
-            _, error = await self._rest_api.revoke_orders(order_ids)
-            if error:
-                SingleTask.run(self._error_callback, error)
-                return False, error
+                _, error = await self._rest_api.revoke_order(self._symbol, order_info["Id"])
+                if error:
+                    SingleTask.run(self._error_callback, error)
+                    return False, error
             return True, None
 
         # If len(order_ids) == 1, you will cancel an order.
         if len(order_ids) == 1:
-            success, error = await self._rest_api.revoke_order(order_ids[0])
+            success, error = await self._rest_api.revoke_order(self._symbol, order_ids[0])
             if error:
                 SingleTask.run(self._error_callback, error)
                 return order_ids[0], error
@@ -660,11 +593,15 @@ class ZbTrade:
 
         # If len(order_ids) > 1, you will cancel multiple orders.
         if len(order_ids) > 1:
-            _, error = await self._rest_api.revoke_orders(order_ids)
-            if error:
-                SingleTask.run(self._error_callback, error)
-                return False, error
-            return True, None
+            success, error = [], []
+            for order_id in order_ids:
+                _, e = await self._rest_api.revoke_order(self._symbol, order_id)
+                if e:
+                    SingleTask.run(self._error_callback, e)
+                    error.append((order_id, e))
+                else:
+                    success.append(order_id)
+            return success, error
 
     async def get_open_order_ids(self):
         """Get open order id list.
@@ -676,12 +613,12 @@ class ZbTrade:
             order_ids: Open order id list, otherwise it's None.
             error: Error information, otherwise it's None.
         """
-        success, error = await self._rest_api.get_open_orders(self._raw_symbol)
+        success, error = await self._rest_api.get_open_orders(self._symbol)
         if error:
             SingleTask.run(self._error_callback, error)
             return None, error
         else:
-            order_infos = success["data"]
+            order_infos = success
             if len(order_infos) > 100:
                 logger.warn("order length too long! (more than 100)", caller=self)
             order_ids = []
