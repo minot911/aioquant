@@ -10,8 +10,9 @@ from aioquant.trade import Trade
 from aioquant.const import BINANCE
 from aioquant.order import Order
 from aioquant.market import Orderbook
-from aioquant.order import ORDER_ACTION_BUY, ORDER_STATUS_FAILED, ORDER_STATUS_CANCELED, ORDER_STATUS_FILLED
+from aioquant.order import ORDER_ACTION_BUY, ORDER_ACTION_SELL, ORDER_STATUS_FAILED, ORDER_STATUS_CANCELED, ORDER_STATUS_FILLED
 from aioquant.utils.decorator import async_method_locker
+from aioquant.error import Error
 
 
 class MyStrategy:
@@ -40,9 +41,10 @@ class MyStrategy:
             "passphrase": self.passphrase,
             "order_update_callback": self.on_event_order_update,
             "init_callback": self.on_init_callback,
+            "error_callback": self.on_order_callback
         }
         self.trader = Trade(**cc)
-
+        self.buyflag = 0
         #请求行情
         #self.trader._t.request_market_by_websocket("orderbook")    
         # 订阅行情 
@@ -60,10 +62,13 @@ class MyStrategy:
     async def on_event_orderbook_update(self, orderbook: Orderbook):
         """ 订单薄更新
         """
-        logger.debug("orderbook_recived:", orderbook, caller=self)
-        bid3_price = orderbook.bids[3][0]  # 买三价格
-        bid4_price = orderbook.bids[4][0]  # 买四价格
-        
+        #logger.debug("orderbook_recived:", orderbook, caller=self)
+        bid3_price = orderbook.bids[2][0]  # 买三价格
+        bid4_price = orderbook.bids[3][0]  # 买四价格
+
+        ask3_price = orderbook.asks[2][0]  # 买三价格
+        ask4_price = orderbook.asks[3][0]  # 买四价格
+
         # 判断是否需要撤单
         if self.order_id:
              if float(self.create_order_price) > float(bid3_price) or float(self.create_order_price) < float(bid4_price):
@@ -75,22 +80,28 @@ class MyStrategy:
              self.order_id = None             
         else:
             # # 创建新订单
-            price = (float(bid3_price) + float(bid4_price)) /2.0
-            quantity = "3.0"  # 假设委托数量为0.1
-            action = ORDER_ACTION_BUY
-            order_id, error = await self.trader.create_order(action, price, quantity)
+            price = (float(ask3_price) + float(ask4_price)) /2.0
+            quantity = "3.5"  # 假设委托数量为0.1
+            action = ORDER_ACTION_SELL     
+            order_id, error = await self.trader.create_order(action, price, quantity)            
             if error:
                 logger.error("create order error! error:", error, caller=self)
                 return
             self.order_id = order_id
-            self.create_order_price = price
-            logger.info("create new order:", order_id, caller=self)
-
+            self.create_order_price = price           
     async def on_event_order_update(self, order: Order):
         """ 订单状态更新
         """
-        logger.info("order update:", order, caller=self)
+        #logger.debug("order id:", self.order_id, caller=self)
+        if order.order_id == self.order_id:
+            logger.debug("order update:", order, caller=self)
 
         # 如果订单失败、订单取消、订单完成交易
-        if order.status in [ORDER_STATUS_FAILED, ORDER_STATUS_CANCELED, ORDER_STATUS_FILLED]:
-            self.order_id = None
+        #if order.status in [ORDER_STATUS_FAILED, ORDER_STATUS_CANCELED, ORDER_STATUS_FILLED]:
+            #self.order_id = None
+
+
+    async def on_order_callback(self, error: Error, **kwagrs):
+        logger.debug("order error:", error, caller=self)
+
+

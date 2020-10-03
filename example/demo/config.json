@@ -5,7 +5,14 @@
         "username": "guest",
         "password": "guest"
     },
-    
+    "LOG": {
+        "console": true,
+        "level": "DEBUG",
+        "path": "/var/log/servers/aioquant",
+        "name": "quant.log",
+        "clear": true,
+        "backup_count": 5
+    },
     "ACCOUNTS": [
         {
             "platform": "zb",

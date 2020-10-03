@@ -201,6 +201,8 @@ class ZbRestAPI:
             "tradeType": tradeType
         }
         success, error = await self.request("POST", uri, params=info, auth=True)
+        if success["code"] != 1000:
+            error = True            
         return success, error
 
     async def revoke_order(self, symbol, order_id):
@@ -426,6 +428,7 @@ class ZbTrade:
         self._secret_key = kwargs["secret_key"]
         self._order_update_callback = kwargs.get("order_update_callback")
         self._init_callback = kwargs.get("init_callback")
+        self._error_callback = kwargs.get("error_callback")
 
         self._raw_symbol = self._symbol.replace("/", "").lower() 
         self._assets = {}
@@ -458,21 +461,9 @@ class ZbTrade:
  
 
     async def connected_callback(self):
-        """After websocket connection created successfully, we will send a message to server for authentication."""
-        timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
-        params = {
-            "AccessKeyId": self._access_key,
-            "SignatureMethod": "HmacSHA256",
-            "SignatureVersion": "2",
-            "Timestamp": timestamp
-        }
-        signature = self._rest_api.generate_signature("GET")
-        params["op"] = "auth"
-        params["Signature"] = signature
-        #req = "{'event':'addChannel','channel':'%s_depth'}" % self._raw_symbol
-        #await self._ws.send(req)
-        #logger.debug("req:", req, caller=self)  
+        """After websocket connection created successfully, we will send a message to server for authentication."""        
         SingleTask.run(self._init_callback, True)
+        await self.requestorderstatus()
        # await self._ws.send(params)
        # await self.markt_connected_callback()
 
@@ -485,14 +476,27 @@ class ZbTrade:
         #logger.debug("msg:", msg, caller=self)
 
         channel = msg.get("channel")
-        type = channel.split('_')
+        type = channel.split('_')        
         if type[-1] == "depth":
             asks = msg["asks"]
             bids = msg["bids"]
             timestamp = msg["timestamp"]
             symbols = type[-2]
+            asks.reverse()
             from aioquant.event import EventOrderbook
             EventOrderbook(Orderbook(self._platform, symbols, asks, bids, timestamp)).publish()
+        if type[-1] == "getordersignoretradetype":
+            if msg["code"] != 1000:
+                logger.error("msg:", msg, caller=self)
+                return
+            
+            for data in msg["data"]:          
+                self._update_order(data)
+        if type[-1] == "record":            
+            for data in msg["record"]:          
+                self._update_order(data)
+            for data in msg["hrecord"]:          
+                self._update_order(data)    
    
     @async_method_locker("ZbTrade.process_binary.locker")
     async def process_binary(self, raw):
@@ -550,8 +554,10 @@ class ZbTrade:
             return None, "action error"
         result, error = await self._rest_api.create_order(self._symbol, price, quantity, t, client_order_id)
         if error:
-            SingleTask.run(self._error_callback, error)
-            return None, error
+            errinfo = "action:{},symbol:{},quantily:{},price:{},err:{}".format(action,self._symbol,quantity,price,result)
+            e = Error(errinfo)
+            SingleTask.run(self._error_callback, e)  
+            return None, e
         order_id = result["id"]
         return order_id, None
 
@@ -637,25 +643,24 @@ class ZbTrade:
         Note:
             order-state: Order status, `submitting` / `submitted` / `partial-filled` / `partial-canceled` / `filled` / `canceled`
         """
-        order_id = str(order_info["order-id"])
-        action = ORDER_ACTION_BUY if order_info["order-type"] in ["buy-market", "buy-limit"] else ORDER_ACTION_SELL
-        state = order_info["order-state"]
-        remain = "%.8f" % float(order_info["unfilled-amount"])
-        avg_price = "%.8f" % float(order_info["price"])
-        ctime = order_info["created-at"]
-        utime = order_info["utime"]
+        order_id = str(order_info[0])
+        action = ORDER_ACTION_BUY if order_info[5] == 1 else ORDER_ACTION_SELL
+        state = order_info[7]
+        remain = "%.8f" % (float(order_info[2]) - float(order_info[3]))
+        if float(order_info[4]) != 0:
+            avg_price = "%.8f" % (float(order_info[4])/float(order_info[3]))
+        else:
+            avg_price = 0
+        ctime = order_info[6]
+        utime = order_info[6]
 
-        if state == "canceled":
+        if state == 1:
             status = ORDER_STATUS_CANCELED
-        elif state == "partial-canceled":
-            status = ORDER_STATUS_CANCELED
-        elif state == "submitting":
-            status = ORDER_STATUS_SUBMITTED
-        elif state == "submitted":
-            status = ORDER_STATUS_SUBMITTED
-        elif state == "partial-filled":
+        elif state == 0:
             status = ORDER_STATUS_PARTIAL_FILLED
-        elif state == "filled":
+        elif state == 3:
+            status = ORDER_STATUS_SUBMITTED
+        elif state == 2:            
             status = ORDER_STATUS_FILLED
         else:
             e = Error("status error! order_info: {}".format(order_info))
@@ -672,8 +677,8 @@ class ZbTrade:
                 "order_id": order_id,
                 "action": action,
                 "symbol": self._symbol,
-                "price": "%.8f" % float(order_info["order-price"]),
-                "quantity": "%.8f" % float(order_info["order-amount"]),
+                "price": "%.8f" % float(order_info[1]),
+                "quantity": "%.8f" % float(order_info[2]),
                 "remain": remain,
                 "status": status
             }
@@ -688,3 +693,34 @@ class ZbTrade:
         SingleTask.run(self._order_update_callback, copy.copy(order))
         if status in [ORDER_STATUS_FAILED, ORDER_STATUS_CANCELED, ORDER_STATUS_FILLED]:
             self._orders.pop(order_id)
+    async def requestorderstatus(self):
+        """{
+            "accesskey": "ceb1569d-7c17-xxxx-b4a1-xxxxxxxxx",
+            "binary": "false",
+            "channel": "push_user_record",
+            "event": "addChannel",
+            "isZip": "false",
+            "market": "zbqcdefault",
+            "sign":"签名"
+            }
+        """
+        reqchannel = "%sdefault" % self._raw_symbol 
+        param = {
+            "accesskey":self._access_key,
+            "binary": "false",
+            "channel": "push_user_record",
+            "event": "addChannel",
+            "isZip": "false",
+            "market": reqchannel         
+        }
+        l = []
+        for key in sorted(param.keys()):
+            l.append('"%s":"%s"' %(key, param[key]))
+        sign = ','.join(l)
+        sign = '{' + sign + '}' 
+        SHA_secret = self._rest_api.digest(self._secret_key)
+        signature = self._rest_api.hmacSign(sign, SHA_secret)       
+        param["sign"] = signature
+        info = json.dumps(param)
+        await self._ws.send(info)
+
