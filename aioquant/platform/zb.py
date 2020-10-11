@@ -464,6 +464,7 @@ class ZbTrade:
         """After websocket connection created successfully, we will send a message to server for authentication."""        
         SingleTask.run(self._init_callback, True)
         await self.requestorderstatus()
+        await self.requestpositiontatus()
        # await self._ws.send(params)
        # await self.markt_connected_callback()
 
@@ -473,7 +474,7 @@ class ZbTrade:
     @async_method_locker("ZbTrade.process_callback.locker")      
     async def process_callback(self, raw):
         msg=raw        
-        #logger.debug("msg:", msg, caller=self)
+        logger.debug("msg:", msg, caller=self)
 
         channel = msg.get("channel")
         type = channel.split('_')        
@@ -723,4 +724,21 @@ class ZbTrade:
         param["sign"] = signature
         info = json.dumps(param)
         await self._ws.send(info)
-
+    async def requestpositiontatus(self):     
+        param = {
+            "accesskey":self._access_key,
+            "binary": "false",
+            "channel": "push_user_asset",
+            "event": "addChannel",
+            "isZip": "false"                 
+        }
+        l = []
+        for key in sorted(param.keys()):
+            l.append('"%s":"%s"' %(key, param[key]))
+        sign = ','.join(l)
+        sign = '{' + sign + '}' 
+        SHA_secret = self._rest_api.digest(self._secret_key)
+        signature = self._rest_api.hmacSign(sign, SHA_secret)       
+        param["sign"] = signature
+        info = json.dumps(param)
+        await self._ws.send(info)
