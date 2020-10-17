@@ -41,7 +41,8 @@ class MyStrategy:
             "passphrase": self.passphrase,
             "order_update_callback": self.on_event_order_update,
             "init_callback": self.on_init_callback,
-            "error_callback": self.on_order_callback
+            "error_callback": self.on_order_callback,
+            "asset_update_callback": self.on_asset_update_callback
         }
         self.trader = Trade(**cc)
         self.buyflag = 0
@@ -104,4 +105,7 @@ class MyStrategy:
     async def on_order_callback(self, error: Error, **kwagrs):
         logger.debug("order error:", error, caller=self)
 
-
+    async def on_asset_update_callback(self, info, **kwagrs):        
+        ques,base = self.symbol.split("/")
+        if info["showName"] == ques or info["showName"] == base:
+            logger.debug("asset info:", info, caller=self)

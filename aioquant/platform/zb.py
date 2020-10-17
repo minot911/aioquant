@@ -429,6 +429,7 @@ class ZbTrade:
         self._order_update_callback = kwargs.get("order_update_callback")
         self._init_callback = kwargs.get("init_callback")
         self._error_callback = kwargs.get("error_callback")
+        self._asset_update_callback = kwargs.get("asset_update_callback")
 
         self._raw_symbol = self._symbol.replace("/", "").lower() 
         self._assets = {}
@@ -474,7 +475,7 @@ class ZbTrade:
     @async_method_locker("ZbTrade.process_callback.locker")      
     async def process_callback(self, raw):
         msg=raw        
-        logger.debug("msg:", msg, caller=self)
+        #logger.debug("msg:", msg, caller=self)
 
         channel = msg.get("channel")
         type = channel.split('_')        
@@ -497,7 +498,10 @@ class ZbTrade:
             for data in msg["record"]:          
                 self._update_order(data)
             for data in msg["hrecord"]:          
-                self._update_order(data)    
+                self._update_order(data)
+        if type[-1] == "asset":
+            for data in  msg["coins"]:
+                self._update_asset(data)
    
     @async_method_locker("ZbTrade.process_binary.locker")
     async def process_binary(self, raw):
@@ -742,3 +746,19 @@ class ZbTrade:
         param["sign"] = signature
         info = json.dumps(param)
         await self._ws.send(info)
+    def _update_asset(self, asset_info):
+        """asset update.
+        Args:
+            order_info: asset information.
+        Returns:
+            None.
+        Note:
+            asset-state: asset status, `available` / `freez` / `total`
+        """
+        pos_info = {               
+                "available": asset_info["available"],
+                "freez": asset_info["freez"],
+                "total": float(asset_info["freez"]) + float(asset_info["available"]),
+                "showName": asset_info["showName"]              
+        }
+        SingleTask.run(self._asset_update_callback, pos_info)

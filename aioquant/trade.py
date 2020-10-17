@@ -48,7 +48,7 @@ class Trade:
 
     def __init__(self, strategy=None, platform=None, symbol=None, host=None, wss=None, account=None, access_key=None,
                  secret_key=None, passphrase=None, order_update_callback=None, position_update_callback=None,
-                 init_callback=None, error_callback=None, **kwargs):
+                 init_callback=None, error_callback=None, asset_update_callback=None, **kwargs):
         """Initialize trade object."""
         kwargs["strategy"] = strategy
         kwargs["platform"] = platform
@@ -63,12 +63,14 @@ class Trade:
         kwargs["position_update_callback"] = self._on_position_update_callback
         kwargs["init_callback"] = self._on_init_callback
         kwargs["error_callback"] = self._on_error_callback
+        kwargs["asset_update_callback"] = self._on_asset_update_callback
 
         self._raw_params = copy.copy(kwargs)
         self._order_update_callback = order_update_callback
         self._position_update_callback = position_update_callback
         self._init_callback = init_callback
         self._error_callback = error_callback
+        self._asset_update_callback = asset_update_callback
 
         if platform == const.BINANCE:
             from aioquant.platform.binance import BinanceTrade as T
@@ -167,6 +169,17 @@ class Trade:
         if not self._position_update_callback:
             return
         await self._position_update_callback(position)
+
+    async def _on_asset_update_callback(self, info) -> None:
+        """Order information update callback.
+
+        Args:
+            order: Order object.
+        """
+        if not self._asset_update_callback:
+            return
+        await self._asset_update_callback(info)
+
 
     async def _on_init_callback(self, success: bool) -> None:
         """Callback function when initialize Trade module finished.
