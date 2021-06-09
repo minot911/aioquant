@@ -49,13 +49,18 @@ class MyStrategy:
         #请求行情
         #self.trader._t.request_market_by_websocket("orderbook")    
         # 订阅行情 
-        Market(const.MARKET_TYPE_ORDERBOOK, self.platform, self.rawsymbol, self.on_event_orderbook_update)
+       # 市场模块
+        ma = {
+            "strategy": self.strategy,
+            "platform": self.platform,
+            "symbol": self.symbol,
+            "market_type": "orderbook",          
+            "update_callback": self.on_event_orderbook_update
+        }
+        Market(**ma)
 
     @async_method_locker("MyStrategy.init_callback.locker")  
-    async def on_init_callback(self, success: bool, **kwagrs):
-        if success == True:
-            await self.trader.marketreqweb(const.MARKET_TYPE_ORDERBOOK)
-            return
+    async def on_init_callback(self, success: bool, **kwagrs): 
         logger.debug("inint err:", success, caller=self)  
     
     
@@ -67,12 +72,12 @@ class MyStrategy:
         bid3_price = orderbook.bids[2][0]  # 买三价格
         bid4_price = orderbook.bids[3][0]  # 买四价格
 
-        ask3_price = orderbook.asks[2][0]  # 买三价格
-        ask4_price = orderbook.asks[3][0]  # 买四价格
+        ask3_price = orderbook.asks[7][0]  # 卖三价格
+        ask4_price = orderbook.asks[10][0]  # 卖四价格
 
         # 判断是否需要撤单
         if self.order_id:
-             if float(self.create_order_price) > float(bid3_price) or float(self.create_order_price) < float(bid4_price):
+             if float(self.create_order_price) > float(ask4_price) or float(self.create_order_price) < float(ask3_price):
                  return
              _, error = await self.trader.revoke_order(self.order_id)
              if error:
@@ -82,7 +87,7 @@ class MyStrategy:
         else:
             # # 创建新订单
             price = (float(ask3_price) + float(ask4_price)) /2.0
-            quantity = "3.5"  # 假设委托数量为0.1
+            quantity = "1.5"  # 假设委托数量为0.1
             action = ORDER_ACTION_SELL     
             order_id, error = await self.trader.create_order(action, price, quantity)            
             if error:
@@ -95,9 +100,8 @@ class MyStrategy:
         """
         #logger.debug("order id:", self.order_id, caller=self)
         if order.order_id == self.order_id:
-            logger.debug("order update:", order, caller=self)
-
-        # 如果订单失败、订单取消、订单完成交易
+            logger.debug("order update:", order, caller=self)                 
+         # 如果订单失败、订单取消、订单完成交易
         #if order.status in [ORDER_STATUS_FAILED, ORDER_STATUS_CANCELED, ORDER_STATUS_FILLED]:
             #self.order_id = None
 

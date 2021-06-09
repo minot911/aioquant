@@ -12,7 +12,8 @@ import json
 
 from aioquant import const
 from aioquant.utils import logger
-
+from aioquant.tasks import SingleTask
+import importlib
 
 class Orderbook:
     """Orderbook object.
@@ -228,12 +229,17 @@ class Market:
                         pass
     """
 
-    def __init__(self, market_type, platform, symbol, callback):
+    def __init__(self, **kwargs):
         """Initialize."""
+
+        market_type = kwargs["market_type"]
+        platform = kwargs["platform"]
+        symbol = kwargs["symbol"]
+        callback = kwargs["update_callback"]
         if platform == "#" or symbol == "#":
             multi = True
-        else:
-            multi = False
+        else:  
+            multi = False         
         if market_type == const.MARKET_TYPE_ORDERBOOK:
             from aioquant.event import EventOrderbook            
             EventOrderbook(Orderbook(platform, symbol)).subscribe(callback, multi)
@@ -250,3 +256,26 @@ class Market:
             EventKline(Kline(platform, symbol, kline_type=market_type)).subscribe(callback, multi)
         else:
             logger.error("market_type error:", market_type, caller=self)
+            return
+        SingleTask.call_later(self.marketreqweb,2,**kwargs)        
+    async def marketreqweb(self,**kwargs):
+        """req market data .
+
+        Args:
+            typechannel: "trade", "orderbook",  "kline" 
+
+        No Returns:
+            success: If execute successfully, return success information, otherwise it's None.
+            error: If execute failed, return error information, otherwise it's None.
+        """
+        # 生产对应交易所的Market对象
+        typechannel = kwargs["market_type"]
+        platform = kwargs["platform"]
+        basic=importlib.import_module("aioquant.platform.{}".format(platform), platform)
+        #MarketClass=platform.capitalize() + 'Market'+ '(**kwargs)'
+        #对象工厂，创建具体的交易市场对象
+        self.ExchangeMarket = basic.ZbMarket(**kwargs)
+        await self.ExchangeMarket.request_market_by_websocket(typechannel)
+        
+        
+        

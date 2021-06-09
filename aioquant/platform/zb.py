@@ -34,7 +34,7 @@ from aioquant.market import Orderbook, Trade, Kline
 from aioquant.configure import config
 
 
-__all__ = ("ZbRestAPI", "ZbTrade", )
+__all__ = ("ZbRestAPI", "ZbTrade", "ZbMarket")
 
 
 class ZbRestAPI:
@@ -48,7 +48,7 @@ class ZbRestAPI:
 
     def __init__(self, access_key, secret_key, host=None):
         """Initialize REST API client."""
-        self._host = host or "http://api.zb.live"        
+        self._host = host or "http://api.zb.today"        
         self._access_key = access_key
         self._secret_key = secret_key
         self._account_id = None
@@ -404,9 +404,9 @@ class ZbTrade:
         if not kwargs.get("symbol"):
             e = Error("param symbol miss")
         if not kwargs.get("host"):
-            kwargs["host"] = "https://api.zb.live"
+            kwargs["host"] = "https://api.zb.today"
         if not kwargs.get("wss"):
-            kwargs["wss"] = "wss://api.zb.live/websocket"
+            kwargs["wss"] = "wss://api.zb.today/websocket"
         if not kwargs.get("access_key"):
             e = Error("param access_key miss")
         if not kwargs.get("secret_key"):
@@ -447,19 +447,7 @@ class ZbTrade:
 
     @property
     def rest_api(self):
-        return self._rest_api
-
-    async def request_market_by_websocket(self, channelType):         
-        if channelType == "orderbook":
-            req = "{'event':'addChannel','channel':'%s_depth'}" % self._raw_symbol                    
-        if channelType == "trade":
-            req = "{'event':'addChannel','channel':'%s_trades'}" % self._raw_symbol  
-        if channelType == "kline":
-            req = "{'event':'addChannel','channel':'%s_ticker'}" % self._raw_symbol        
-        await self._ws.send(req)
-        logger.debug("req:", req, caller=self)
-        return True, None
- 
+        return self._rest_api 
 
     async def connected_callback(self):
         """After websocket connection created successfully, we will send a message to server for authentication."""        
@@ -762,3 +750,66 @@ class ZbTrade:
                 "showName": asset_info["showName"]              
         }
         SingleTask.run(self._asset_update_callback, pos_info)
+
+class ZbMarket:
+    def __init__(self, **kwargs):
+        """Initialize Trade module."""   
+        e = None
+        if not kwargs.get("symbol"):
+            e = Error("param symbol miss")
+        if not kwargs.get("host"):
+            kwargs["host"] = "https://api.zb.today"
+        if not kwargs.get("wss"):
+            kwargs["wss"] = "wss://api.zb.today/websocket"
+        if e:
+            logger.error(e, caller=self)
+            return
+
+        self._platform = kwargs["platform"]
+        self._symbol = kwargs["symbol"]
+        self._host = kwargs["host"]
+        self._wss = kwargs["wss"]     
+
+        self._raw_symbol = self._symbol.replace("/", "").lower() 
+        url = self._wss 
+        self._ws = Websocket(url, self.connected_callback, process_binary_callback=self.process_binary, process_callback=self.process_callback)
+    @async_method_locker("ZbMarket.process_binary.locker")
+    async def process_binary(self, raw):
+        """Process binary message that received from websocket.
+
+        Args:
+            raw: Binary message received from websocket.
+
+        Returns:
+            None.
+        """
+        pass
+    async def connected_callback(self):
+        """After websocket connection created successfully, we will send a message to server for authentication."""
+        logger.debug("market web connect", caller=self)
+
+    @async_method_locker("ZbMarket.process_callback.locker")      
+    async def process_callback(self, raw):
+        msg=raw        
+        #logger.debug("msg:", msg, caller=self)
+
+        channel = msg.get("channel")
+        type = channel.split('_')        
+        if type[-1] == "depth":
+            asks = msg["asks"]
+            bids = msg["bids"]
+            timestamp = msg["timestamp"]
+            symbols = type[-2]
+            asks.reverse()
+            from aioquant.event import EventOrderbook
+            EventOrderbook(Orderbook(self._platform, symbols, asks, bids, timestamp)).publish()
+    async def request_market_by_websocket(self, channelType):         
+        if channelType == "orderbook":
+            req = "{'event':'addChannel','channel':'%s_depth'}" % self._raw_symbol                    
+        if channelType == "trade":
+            req = "{'event':'addChannel','channel':'%s_trades'}" % self._raw_symbol  
+        if channelType == "kline":
+            req = "{'event':'addChannel','channel':'%s_ticker'}" % self._raw_symbol        
+        await self._ws.send(req)
+        logger.debug("req:", req, caller=self)
+        return True, None

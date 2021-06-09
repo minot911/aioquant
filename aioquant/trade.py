@@ -213,14 +213,4 @@ class Trade:
         }
         await self._error_callback(error, **params)
     
-    async def marketreqweb(self,typechannel):
-        """req market data .
-
-        Args:
-            typechannel: "trade", "orderbook",  "kline" 
-
-        No Returns:
-            success: If execute successfully, return success information, otherwise it's None.
-            error: If execute failed, return error information, otherwise it's None.
-        """
-        await self._t.request_market_by_websocket(typechannel)        
+       

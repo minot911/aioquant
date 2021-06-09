@@ -1,0 +1,1 @@
+all    = ['binance', 'huobi', 'okex', 'zb'] 
