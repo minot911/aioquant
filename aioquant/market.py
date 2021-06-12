@@ -257,7 +257,7 @@ class Market:
         else:
             logger.error("market_type error:", market_type, caller=self)
             return
-        SingleTask.call_later(self.marketreqweb,2,**kwargs)        
+        SingleTask.run(self.marketreqweb,**kwargs)        
     async def marketreqweb(self,**kwargs):
         """req market data .
 
@@ -271,10 +271,12 @@ class Market:
         # 生产对应交易所的Market对象
         typechannel = kwargs["market_type"]
         platform = kwargs["platform"]
-        basic=importlib.import_module("aioquant.platform.{}".format(platform), platform)
-        #MarketClass=platform.capitalize() + 'Market'+ '(**kwargs)'
+        #导入对应交易所的模块
+        ExchangeModel=importlib.import_module("aioquant.platform.{}".format(platform.lower()))
+        MarketClassName=platform.capitalize() + 'Market'
         #对象工厂，创建具体的交易市场对象
-        self.ExchangeMarket = basic.ZbMarket(**kwargs)
+        MarketClass=getattr(ExchangeModel,MarketClassName)
+        ExchangeMarket = MarketClass(**kwargs)
         await self.ExchangeMarket.request_market_by_websocket(typechannel)
         
         

@@ -68,7 +68,7 @@ class Websocket:
         proxy = config.proxy
         session = aiohttp.ClientSession()
         try:
-            self._ws = await session.ws_connect(self._url, proxy=proxy)
+            self._ws = await session.ws_connect(self._url, proxy=proxy,autoping=True,heartbeat=self._check_conn_interval/2)
         except aiohttp.ClientConnectorError:
             logger.error("connect to Websocket server error! url:", self._url, caller=self)
             return
