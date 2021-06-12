@@ -54,8 +54,9 @@ class MyStrategy:
             "strategy": self.strategy,
             "platform": self.platform,
             "symbol": self.symbol,
-            "market_type": "orderbook",          
-            "update_callback": self.on_event_orderbook_update
+            "market_type": "orderbook",     
+            "init_callback": self.on_market_init_callback,     
+            "update_callback": self.on_event_orderbook_update            
         }
         Market(**ma)
 
@@ -68,7 +69,7 @@ class MyStrategy:
     async def on_event_orderbook_update(self, orderbook: Orderbook):
         """ 订单薄更新
         """
-        #logger.debug("orderbook_recived:", orderbook, caller=self)
+        logger.debug("orderbook_recived:", orderbook, caller=self)
         bid3_price = orderbook.bids[2][0]  # 买三价格
         bid4_price = orderbook.bids[3][0]  # 买四价格
 
@@ -88,7 +89,7 @@ class MyStrategy:
             # # 创建新订单
             price = (float(ask3_price) + float(ask4_price)) /2.0
             quantity = "1.5"  # 假设委托数量为0.1
-            action = ORDER_ACTION_SELL     
+            action = ORDER_ACTION_BUY     
             order_id, error = await self.trader.create_order(action, price, quantity)            
             if error:
                 logger.error("create order error! error:", error, caller=self)
@@ -113,3 +114,6 @@ class MyStrategy:
         ques,base = self.symbol.split("/")
         if info["showName"] == ques or info["showName"] == base:
             logger.debug("asset info:", info, caller=self)
+    @async_method_locker("MyStrategy.market_init_callback.locker")  
+    async def on_market_init_callback(self, success: bool, **kwagrs): 
+        logger.debug("inint market:", success, caller=self)  

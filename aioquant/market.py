@@ -9,6 +9,7 @@ Email:  huangtao@ifclover.com
 """
 
 import json
+from signal import signal
 
 from aioquant import const
 from aioquant.utils import logger
@@ -229,23 +230,28 @@ class Market:
                         pass
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, init_callback, update_callback, **kwargs):
         """Initialize."""
+
+
+        kwargs["init_callback"] = self._on_init_callback       
+        self._init_callback = init_callback
+        self._update_callback = update_callback
 
         market_type = kwargs["market_type"]
         platform = kwargs["platform"]
         symbol = kwargs["symbol"]
-        callback = kwargs["update_callback"]
+        
         if platform == "#" or symbol == "#":
             multi = True
         else:  
             multi = False         
         if market_type == const.MARKET_TYPE_ORDERBOOK:
             from aioquant.event import EventOrderbook            
-            EventOrderbook(Orderbook(platform, symbol)).subscribe(callback, multi)
+            EventOrderbook(Orderbook(platform, symbol)).subscribe(self._update_callback, multi)
         elif market_type == const.MARKET_TYPE_TRADE:
             from aioquant.event import EventTrade
-            EventTrade(Trade(platform, symbol)).subscribe(callback, multi)
+            EventTrade(Trade(platform, symbol)).subscribe(self._update_callback, multi)
         elif market_type in [
             const.MARKET_TYPE_KLINE, const.MARKET_TYPE_KLINE_3M, const.MARKET_TYPE_KLINE_5M,
             const.MARKET_TYPE_KLINE_15M, const.MARKET_TYPE_KLINE_30M, const.MARKET_TYPE_KLINE_1H,
@@ -253,12 +259,12 @@ class Market:
             const.MARKET_TYPE_KLINE_1D, const.MARKET_TYPE_KLINE_3D, const.MARKET_TYPE_KLINE_1W,
             const.MARKET_TYPE_KLINE_15D, const.MARKET_TYPE_KLINE_1MON, const.MARKET_TYPE_KLINE_1Y]:
             from aioquant.event import EventKline
-            EventKline(Kline(platform, symbol, kline_type=market_type)).subscribe(callback, multi)
+            EventKline(Kline(platform, symbol, kline_type=market_type)).subscribe(self._update_callback, multi)
         else:
             logger.error("market_type error:", market_type, caller=self)
             return
-        SingleTask.run(self.marketreqweb,**kwargs)        
-    async def marketreqweb(self,**kwargs):
+        self.marketreqweb(**kwargs)        
+    def marketreqweb(self,**kwargs):
         """req market data .
 
         Args:
@@ -269,15 +275,26 @@ class Market:
             error: If execute failed, return error information, otherwise it's None.
         """
         # 生产对应交易所的Market对象
-        typechannel = kwargs["market_type"]
+        self.typechannel = kwargs["market_type"]
         platform = kwargs["platform"]
         #导入对应交易所的模块
         ExchangeModel=importlib.import_module("aioquant.platform.{}".format(platform.lower()))
         MarketClassName=platform.capitalize() + 'Market'
         #对象工厂，创建具体的交易市场对象
-        MarketClass=getattr(ExchangeModel,MarketClassName)
-        ExchangeMarket = MarketClass(**kwargs)
-        await self.ExchangeMarket.request_market_by_websocket(typechannel)
+        MarketClass=getattr(ExchangeModel,MarketClassName)       
+        self.ExchangeMarket = MarketClass(**kwargs)        
+       
+    async def _on_init_callback(self, success: bool) -> None:
+        """Callback function when initialize Trade module finished.
+
+        Args:
+            success: `True` if initialize Trade module success, otherwise `False`.
+        """
+        logger.debug("_on_init_callback:", caller=self)
+        await self.ExchangeMarket.request_market_by_websocket(self.typechannel)
+        if not self._init_callback:
+            return
+        await self._init_callback(success) 
         
         
         

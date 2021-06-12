@@ -418,6 +418,7 @@ class ZbTrade:
             SingleTask.run(kwargs["init_callback"], False)
             return
 
+
         self._account = kwargs["account"]
         self._strategy = kwargs["strategy"]
         self._platform = kwargs["platform"]
@@ -764,7 +765,7 @@ class ZbMarket:
         if e:
             logger.error(e, caller=self)
             return
-
+        self._init_callback = kwargs["init_callback"]
         self._platform = kwargs["platform"]
         self._symbol = kwargs["symbol"]
         self._host = kwargs["host"]
@@ -783,16 +784,17 @@ class ZbMarket:
         Returns:
             None.
         """
-        pass
+        msg=raw        
+        logger.debug("msg:", msg, caller=self)
+        
     async def connected_callback(self):
         """After websocket connection created successfully, we will send a message to server for authentication."""
+        SingleTask.run(self._init_callback, True)
         logger.debug("market web connect", caller=self)
 
     @async_method_locker("ZbMarket.process_callback.locker")      
     async def process_callback(self, raw):
-        msg=raw        
-        #logger.debug("msg:", msg, caller=self)
-
+        msg=raw
         channel = msg.get("channel")
         type = channel.split('_')        
         if type[-1] == "depth":
@@ -801,8 +803,11 @@ class ZbMarket:
             timestamp = msg["timestamp"]
             symbols = type[-2]
             asks.reverse()
+            if self._raw_symbol == symbols:
+                symbols = self._symbol
             from aioquant.event import EventOrderbook
             EventOrderbook(Orderbook(self._platform, symbols, asks, bids, timestamp)).publish()
+    @async_method_locker("ZbMarket.request_market_by_websocket.locker")
     async def request_market_by_websocket(self, channelType):         
         if channelType == "orderbook":
             req = "{'event':'addChannel','channel':'%s_depth'}" % self._raw_symbol                    
