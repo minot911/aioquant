@@ -79,7 +79,7 @@ class ZbRestAPI:
         Note:
             When type is set to `step0`, the default value of `depth` is 150 instead of 20.
         """
-        symbol=symbol.replace("/", "-").lower()
+        symbol=symbol.replace("/", "_").lower()
         uri = "/data/v1/depth?market={symbol}&size={depth}".format(symbol=symbol,depth=depth)
         success, error = await self.request("GET", uri)
         return success, error
@@ -785,7 +785,7 @@ class ZbMarket:
             None.
         """
         msg=raw        
-        logger.debug("msg:", msg, caller=self)
+        #logger.debug("msg:", msg, caller=self)
         
     async def connected_callback(self):
         """After websocket connection created successfully, we will send a message to server for authentication."""
@@ -816,5 +816,5 @@ class ZbMarket:
         if channelType == "kline":
             req = "{'event':'addChannel','channel':'%s_ticker'}" % self._raw_symbol        
         await self._ws.send(req)
-        logger.debug("req:", req, caller=self)
+        #logger.debug("req:", req, caller=self)
         return True, None

@@ -131,7 +131,7 @@ class Websocket:
         else:
             logger.error("send message failed:", data, caller=self)
             return False
-        logger.debug("send message:", data, caller=self)
+        #logger.debug("send message:", data, caller=self)
         return True
 
 
@@ -201,8 +201,6 @@ class AsyncHttpRequests(object):
             result = await response.text()
             logger.debug("response data is not json format!", "method:", method, "url:", url, "headers:", headers,
                          "params:", params, "body:", body, "data:", data, "code:", code, "result:", result, caller=cls)
-        logger.debug("method:", method, "url:", url, "headers:", headers, "params:", params, "body:", body,
-                     "data:", data, "code:", code, "result:", json.dumps(result), caller=cls)
         return code, result, None
 
     @classmethod

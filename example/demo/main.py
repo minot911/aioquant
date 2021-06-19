@@ -6,7 +6,7 @@ from aioquant import quant
 
 
 def initialize():
-    from strategy.strategy import MyStrategy
+    from strategy.strategy_zb_triangle import MyStrategy
     MyStrategy()
 
 
