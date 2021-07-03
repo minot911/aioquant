@@ -6,7 +6,7 @@
         "password": "guest"
     },
     "LOG": {
-        "console": false,
+        "console": true,
         "level": "DEBUG",
         "path": "/var/log/servers/aioquant",
         "name": "quant.log",

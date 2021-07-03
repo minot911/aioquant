@@ -16,7 +16,7 @@ from aioquant.error import Error
 from aioquant.utils import logger
 from aioquant.tasks import SingleTask
 from aioquant.order import Order
-from aioquant.position import Position
+from aioquant.position import Position, Asset
 
 
 class Trade:
@@ -170,7 +170,7 @@ class Trade:
             return
         await self._position_update_callback(position)
 
-    async def _on_asset_update_callback(self, info) -> None:
+    async def _on_asset_update_callback(self, asset:Asset) -> None:
         """Order information update callback.
 
         Args:
@@ -178,7 +178,7 @@ class Trade:
         """
         if not self._asset_update_callback:
             return
-        await self._asset_update_callback(info)
+        await self._asset_update_callback(asset)
 
 
     async def _on_init_callback(self, success: bool) -> None:

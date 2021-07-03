@@ -30,7 +30,7 @@ from aioquant.order import ORDER_ACTION_BUY, ORDER_ACTION_SELL
 from aioquant.order import ORDER_TYPE_LIMIT, ORDER_TYPE_MARKET
 from aioquant.order import ORDER_STATUS_SUBMITTED, ORDER_STATUS_PARTIAL_FILLED, ORDER_STATUS_FILLED, \
     ORDER_STATUS_CANCELED, ORDER_STATUS_FAILED
-from aioquant.market import Orderbook, Trade, Kline
+from aioquant.market import Orderbook, Trade, Kline, Asset
 from aioquant.configure import config
 
 
@@ -490,7 +490,9 @@ class ZbTrade:
                 self._update_order(data)
         if type[-1] == "asset":
             for data in  msg["coins"]:
-                self._update_asset(data)
+                data["timestamp"] = msg["version"]
+                if data["showName"] in self._symbol.split('/'):
+                    self._update_asset(data)   
    
     @async_method_locker("ZbTrade.process_binary.locker")
     async def process_binary(self, raw):
@@ -740,17 +742,20 @@ class ZbTrade:
         Args:
             order_info: asset information.
         Returns:
-            None.
+            None.    platform=None, coins=None, available=None, freez=None, total=None, timestamp=None
         Note:
             asset-state: asset status, `available` / `freez` / `total`
-        """
+       
         pos_info = {               
                 "available": asset_info["available"],
                 "freez": asset_info["freez"],
-                "total": float(asset_info["freez"]) + float(asset_info["available"]),
+                "total":,
                 "showName": asset_info["showName"]              
         }
-        SingleTask.run(self._asset_update_callback, pos_info)
+         """
+        totol= float(asset_info["freez"]) + float(asset_info["available"])
+        asset=Asset(platform = self._platform, coins = asset_info["showName"], available = asset_info["available"], freez=asset_info["freez"],total=totol,timestamp=asset_info["timestamp"])
+        SingleTask.run(self._asset_update_callback, asset)
 
 class ZbMarket:
     def __init__(self, **kwargs):

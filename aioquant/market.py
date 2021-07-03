@@ -212,6 +212,65 @@ class Kline:
     def __repr__(self):
         return str(self)
 
+class Asset:
+    """Asset object.
+
+    Args:
+        platform: Exchange platform name, e.g. `binance` / `bitmex`.
+        symbol: Asset pair name, e.g. `ETH`.
+        timestamp: Update time, millisecond.
+    """ 
+
+    def __init__(self, platform=None, coins=None, available=None, freez=None, total=None, timestamp=None):
+        """Initialize."""
+        self.platform = platform
+        self.coins = coins
+        self.available = available
+        self.freez = freez
+        self.total = total
+        self.timestamp = timestamp
+
+    @property
+    def data(self):
+        d = {
+            "platform": self.platform,
+            "coins": self.coins,
+            "available": self.available,
+            "freez": self.freez,
+            "total": self.total,
+            "timestamp": self.timestamp
+        }
+        return d
+
+    @property
+    def smart(self):
+        d = {
+            "p": self.platform,
+            "s": self.coins,
+            "a": self.available,
+            "P": self.freez,
+            "q": self.total,
+            "t": self.timestamp
+        }
+        return d
+
+    def load_smart(self, d):
+        self.platform = d["p"]
+        self.coins = d["s"]
+        self.available = d["a"]
+        self.freez = d["P"]
+        self.total = d["q"]
+        self.timestamp = d["t"]
+        return self
+
+    def __str__(self):
+        info = json.dumps(self.data)
+        return info
+
+    def __repr__(self):
+        return str(self)
+
+
 
 class Market:
     """Subscribe Market.

@@ -9,7 +9,7 @@ from aioquant.market import Market
 from aioquant.trade import Trade
 from aioquant.const import BINANCE
 from aioquant.order import Order
-from aioquant.market import Orderbook
+from aioquant.market import Orderbook, Asset
 from aioquant.order import ORDER_ACTION_BUY, ORDER_ACTION_SELL, ORDER_STATUS_FAILED, ORDER_STATUS_CANCELED, ORDER_STATUS_FILLED
 from aioquant.utils.decorator import async_method_locker
 from aioquant.error import Error
@@ -135,10 +135,10 @@ class MyStrategy:
     async def on_order_callback(self, error: Error, **kwagrs):
         logger.debug("order error:", error, caller=self)
 
-    async def on_asset_update_callback(self, info, **kwagrs):        
-        ques,base = self.symbol.split("/")
-        if info["showName"] == ques or info["showName"] == base:
-            logger.debug("asset info:", info, caller=self)
+    async def on_asset_update_callback(self, asset:Asset, **kwagrs):        
+        logger.debug("asset:", asset.data, caller=self)
+
+
     @async_method_locker("MyStrategy.market_init_callback.locker")  
     async def on_market_init_callback(self, success: bool, **kwagrs): 
         logger.debug("inint market:", success, caller=self)  
@@ -195,7 +195,7 @@ class MyStrategy:
     async def runfunc(self, *args, **kwargs):
         LoopRunTask.register(self.calcutpricegap, 3)
         LoopRunTask.register(self.UpdateErate, 30)
-        LoopRunTask.register(self.hearbeat, 1800)
+        #LoopRunTask.register(self.hearbeat, 1800)
 
 
 

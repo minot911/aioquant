@@ -17,7 +17,7 @@ import aioamqp
 from aioquant.utils import logger
 from aioquant.configure import config
 from aioquant.tasks import LoopRunTask, SingleTask
-from aioquant.market import Orderbook, Trade, Kline
+from aioquant.market import Orderbook, Trade, Kline, Asset
 from aioquant.utils.decorator import async_method_locker
 
 
@@ -191,7 +191,28 @@ class EventTrade(Event):
     def parse(self):
         trade = Trade().load_smart(self.data)
         return trade
+class EventAsset(Event):
+    """Asset event.
 
+    Attributes:
+        Asset: Asset object.
+
+    * NOTE:
+        Publisher: Market server.
+        Subscriber: Any servers.
+    """
+
+    def __init__(self, asset: Asset):
+        """Initialize."""
+        name = "EVENT_ASSET"
+        exchange = "Asset"
+        routing_key = "{p}.{s}".format(p=asset.platform, s=asset.coins)
+        queue = "{sid}.{ex}.{rk}".format(sid=config.server_id, ex=exchange, rk=routing_key)
+        super(EventAsset, self).__init__(name, exchange, queue, routing_key, data=asset.smart)
+
+    def parse(self):
+        asset = Asset().load_smart(self.data)
+        return asset
 
 class EventCenter:
     """Event center.
