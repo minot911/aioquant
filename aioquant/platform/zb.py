@@ -224,7 +224,7 @@ class ZbRestAPI:
             "method": "cancelOrder",
             "id": order_id
         }
-        success, error = await self.request("POST", uri, params=params, auth=True)
+        success, error = await self.request("POST", uri, params=params, auth=True)        
         return success, error
 
     async def get_open_orders(self, symbol, limit=50):
@@ -251,6 +251,8 @@ class ZbRestAPI:
             "pageSize": limit
         }
         success, error = await self.request("GET", uri, params=params, auth=True)
+
+    
         return success, error
 
     async def get_order_status(self, order_id, symbol = None):
@@ -476,14 +478,13 @@ class ZbTrade:
             asks.reverse()
             from aioquant.event import EventOrderbook
             EventOrderbook(Orderbook(self._platform, symbols, asks, bids, timestamp)).publish()
-        if type[-1] == "getordersignoretradetype":
+        if type[-1] == "getordersignoretradetype":            
             if msg["code"] != 1000:
                 logger.error("msg:", msg, caller=self)
-                return
-            
+                return            
             for data in msg["data"]:          
                 self._update_order(data)
-        if type[-1] == "record":            
+        if type[-1] == "record":                    
             for data in msg["record"]:          
                 self._update_order(data)
             for data in msg["hrecord"]:          
@@ -771,6 +772,7 @@ class ZbMarket:
             logger.error(e, caller=self)
             return
         self._init_callback = kwargs["init_callback"]
+        self._symbol_config_callback = kwargs["symbol_config_callback"]
         self._platform = kwargs["platform"]
         self._symbol = kwargs["symbol"]
         self._host = kwargs["host"]
@@ -801,6 +803,9 @@ class ZbMarket:
     async def process_callback(self, raw):
         msg=raw
         channel = msg.get("channel")
+        if channel == "markets":
+            self.deal_symbol_config_info(msg["data"])
+            return
         type = channel.split('_')        
         if type[-1] == "depth":
             asks = msg["asks"]
@@ -812,6 +817,7 @@ class ZbMarket:
                 symbols = self._symbol
             from aioquant.event import EventOrderbook
             EventOrderbook(Orderbook(self._platform, symbols, asks, bids, timestamp)).publish()
+        
     @async_method_locker("ZbMarket.request_market_by_websocket.locker")
     async def request_market_by_websocket(self, channelType):         
         if channelType == "orderbook":
@@ -823,3 +829,22 @@ class ZbMarket:
         await self._ws.send(req)
         #logger.debug("req:", req, caller=self)
         return True, None
+    @async_method_locker("ZbMarket.request_symbo_config_by_websocket.locker")
+    async def request_symbo_config_by_websocket(self): 
+         req = "{'event':'addChannel','channel':'markets'}" 
+         await self._ws.send(req)   
+
+    def deal_symbol_config_info(self,data):
+        uniq_symbol = self._symbol.replace("/", "_").lower()
+
+        symbol_config= {
+            "platform": self._platform,
+            "symbol": self._symbol,
+            "priceScale": data[uniq_symbol]["priceScale"],
+            "minAmount": data[uniq_symbol]["minAmount"],
+            "minSize": data[uniq_symbol]["minSize"],
+            "amountScale":  data[uniq_symbol]["amountScale"]
+        }   
+
+        self._symbol_config_callback(symbol_config)
+         

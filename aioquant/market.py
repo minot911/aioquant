@@ -293,10 +293,11 @@ class Market:
         """Initialize."""
 
 
-        kwargs["init_callback"] = self._on_init_callback       
+        kwargs["init_callback"] = self._on_init_callback
+        kwargs["symbol_config_callback"] = self.symbol_config_callback            
         self._init_callback = init_callback
         self._update_callback = update_callback
-
+        self.symbolConfig = {}
         market_type = kwargs["market_type"]
         platform = kwargs["platform"]
         symbol = kwargs["symbol"]
@@ -351,9 +352,31 @@ class Market:
         """
         logger.debug("_on_init_callback:", caller=self)
         await self.ExchangeMarket.request_market_by_websocket(self.typechannel)
+        self.symbolConfig = await self.ExchangeMarket.request_symbo_config_by_websocket()
         if not self._init_callback:
             return
         await self._init_callback(success) 
+    def symbol_config_callback(self, data):
+        self.symbolConfig=data
+
+
+    @property
+    def marketSymbolconfig(self):
+        """
+        priceScale	价格小数位数
+        minAmount	交易币种最低成交数量
+        minSize	计价币种最低成交数量
+        amountScale	数量小数位数
+        """
+        d = {
+            "platform": self.symbolConfig[ "platform"],
+            "symbol": self.symbolConfig[ "symbol"],
+            "priceScale": self.symbolConfig[ "priceScale"],
+            "minAmount": self.symbolConfig[ "minAmount"],
+            "minSize": self.symbolConfig[ "minSize"],
+            "amountScale": self.symbolConfig[ "amountScale"]
+        }
+        return d
         
         
         

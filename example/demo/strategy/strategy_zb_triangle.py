@@ -15,6 +15,10 @@ from aioquant.utils.decorator import async_method_locker
 from aioquant.error import Error
 from aioquant.platform import zb
 from aioquant.tasks import SingleTask, LoopRunTask
+import asyncio
+
+negDirection = 1
+posDirection = -1
 
 commarket=[
             ('SHIB/QC', 'SHIB/USDT'),
@@ -43,6 +47,11 @@ class MyStrategy:
         self.orderbook={}
         self.market = {}
         self.erate = None
+        self.asset = {}
+        self.MaxposA_B = None
+        self.MaxnegA_B = None
+        self.orderId = None
+        self.act_revok = False
         # 交易模块
         for i in range(0, len(commarket)):
             for j in range(0,2):             
@@ -68,10 +77,7 @@ class MyStrategy:
                             "init_callback": self.on_market_init_callback,     
                             "update_callback": self.on_event_orderbook_update            
                         }
-                self.market[commarket[i][j]]=Market(**ma)
-  
-
-        
+                self.market[commarket[i][j]]=Market(**ma)       
         
         self.buyflag = 0
         SingleTask.call_later(self.runfunc,5)        
@@ -118,33 +124,50 @@ class MyStrategy:
     async def on_event_order_update(self, order: Order):
         """ 订单状态更新
         """
-        pass
+        #logger.debug("order id:", order, caller=self)
+        if order.data["order_id"] == self.orderId and order.data["quantity"] > order.data["remain"]:
+            Tradeamount = float(order.data["quantity"] - order.data["remain"])            
+            symbolid=self.next_symbol.split("/")
+            baseId = symbolid[0]
+            quoteId = symbolid[1] 
+            bseIdfreeamount=self.asset[baseId]['available']
+            sellDepth=self.orderbook[self.next_symbol] 
+            sellprice=sellDepth['bids'][2][0]
+            jindu=1/float(self.market[self.next_symbol].marketSymbolconfig["minAmount"])
+            if bseIdfreeamount < Tradeamount:
+                sellamount = math.floor((bseIdfreeamount*jindu))/jindu
+            if bseIdfreeamount >= Tradeamount:
+                sellamount = Tradeamount
+            action = ORDER_ACTION_SELL
+            order_id, error = await self.trader[self.next_symbol].create_order(action, sellprice, sellamount)       
         #logger.debug("order id:", self.order_id, caller=self)
-        """
-        if order.order_id == self.order_id:
-            logger.debug("order update:", order, caller=self)
-            if order.status in [ORDER_STATUS_FAILED, ORDER_STATUS_CANCELED, ORDER_STATUS_FILLED]:
-                self.order_id = None
-        """
 
-         # 如果订单失败、订单取消、订单完成交易
-        #if order.status in [ORDER_STATUS_FAILED, ORDER_STATUS_CANCELED, ORDER_STATUS_FILLED]:
-            #self.order_id = None
 
 
     async def on_order_callback(self, error: Error, **kwagrs):
         logger.debug("order error:", error, caller=self)
 
+
     async def on_asset_update_callback(self, asset:Asset, **kwagrs):        
-        logger.debug("asset:", asset.data, caller=self)
+        self.asset[asset.data["coins"]] = asset.data
+        
 
 
     @async_method_locker("MyStrategy.market_init_callback.locker")  
     async def on_market_init_callback(self, success: bool, **kwagrs): 
         logger.debug("inint market:", success, caller=self)  
-
+    @async_method_locker("MyStrategy.calcutpricegap.locker")  
     async def calcutpricegap(self, *args, **kwargs): 
        
+        if self.erate == None:
+            logger.debug("Erate is none:", self.erate, caller=self)
+            return 
+        if self.orderId != None:
+            _, error = await self.trader[self.oldsymbol].revoke_order(self.orderId)
+            logger.debug("only revoke orderid:", self.orderId,"oldsymbol",self.oldsymbol,"error",error,caller=self)                
+            self.act_revok = True
+            self.orderId = None
+            await asyncio.sleep(0.5)
         for i in range(0, len(commarket)):
             Maxpospercent = 0
             Maxnegpercent = 0
@@ -154,8 +177,7 @@ class MyStrategy:
                 continue
             Adepth=self.orderbook[Asymbol]            
             Bdepth=self.orderbook[Bsymbol]            
-            if self.erate == None:
-                return
+
             A_B=self.get_ABsymbol_dprice(Asymbol, Adepth, Bsymbol, Bdepth, self.erate)
 
             if A_B['A_B_price']>=0:                
@@ -166,11 +188,29 @@ class MyStrategy:
                 if A_B['A_B_percent']>=Maxnegpercent: 
                     Maxnegpercent=A_B['A_B_percent']
                     self.MaxnegA_B=(Asymbol,Bsymbol,A_B['A_B_price'],A_B['A_B_percent'])
-                    
-        if Maxpospercent >0.05 or Maxnegpercent >0.05:
+        
+                
+        #logger.debug('MaxposA_B', self.MaxposA_B, 'MaxnegA_B', self.MaxnegA_B, caller=self)
+        if self.asset["QC"]['available'] == None or self.asset["USDT"]['available'] == None:
+            logger.debug("QC or USDT is Noe:", self.asset, caller=self)
+            return         
+        flag=3
+       
+        if float(self.asset["QC"]['available']) >= float(self.asset["USDT"]['available'])*self.erate*float(10.0):
+            flag=1
+        if float(self.asset["QC"]['available'])*float(10.0) <= float(self.asset["USDT"]['available'])*self.erate:
+            flag=0
+        if Maxpospercent >0.01 or Maxnegpercent >0.01:
             logger.debug('MaxposA_B',self.MaxposA_B,caller=self)
             logger.debug('MaxnegA_B',self.MaxnegA_B,caller=self) 
-            logger.debug('Erate:',self.erate)
+            logger.debug("QC",self.asset["QC"]['available'],"USDT",self.asset["USDT"]['available'],"flag",flag,'Erate:',self.erate)
+        if (Maxnegpercent>=Maxpospercent and Maxnegpercent>=0.01) and flag != 0:
+            await self.DirectionTrans(self.MaxnegA_B,negDirection)
+            return
+        if (Maxnegpercent<Maxpospercent and Maxpospercent>=0.01) and flag != 1:
+            await self.DirectionTrans(self.MaxposA_B,posDirection)
+            return
+       
     def get_ABsymbol_dprice(self, Asymbol, Adepth, Bsymbol, Bdepth, Erate):        
         A_B={}
         if Bdepth['bids']!=None and Adepth['bids']!=None:
@@ -189,7 +229,8 @@ class MyStrategy:
     async def UpdateErate(self, *args, **kwargs):
         self._rest_api = zb.ZbRestAPI(self.access_key, self.secret_key)
         sucess, error = await self._rest_api.get_orderbook(symbol="USDT/QC")
-        self.erate = sucess['bids'][0][0]
+        self.erate = float(sucess['bids'][0][0])
+       
     async def hearbeat(self, *args, **kwargs):
         logger.debug('still alive',caller=self)
     async def runfunc(self, *args, **kwargs):
@@ -197,7 +238,35 @@ class MyStrategy:
         LoopRunTask.register(self.UpdateErate, 30)
         #LoopRunTask.register(self.hearbeat, 1800)
 
+    async def DirectionTrans(self,MaxA_B,dirction):
+         
+        if dirction == negDirection:
+            Asymbol = MaxA_B[0]
+            Bsymbol = MaxA_B[1]
+        if dirction == posDirection:
+            Asymbol = MaxA_B[1]
+            Bsymbol = MaxA_B[0]
+      
+        Asymbolid=Asymbol.split("/")
+        baseId = Asymbolid[0]
+        quoteId = Asymbolid[1] 
+    
+        AbseIdfreeamount=float(self.asset[baseId]['available'])        
+        AquoteIdfreeamount=float(self.asset[quoteId]['available'])       
+        newMaxposdepth=self.orderbook[Asymbol]        
 
-
-
-
+        pricelimt = 1/(float(self.market[Asymbol].marketSymbolconfig["priceScale"])**10)
+        amountlimt = float(self.market[Asymbol].marketSymbolconfig["minAmount"])
+        buyprice=float(newMaxposdepth['bids'][0][0])+ pricelimt
+        amount=(AquoteIdfreeamount-1)/buyprice   
+          
+        if amount>10.0*amountlimt and self.orderId == None:
+            self.buyprice = buyprice
+            action = ORDER_ACTION_BUY
+            order_id, error = await self.trader[Asymbol].create_order(action, buyprice, amount)
+            self.orderId = order_id
+            logger.debug("creat orderid:", order_id,"Symbol:",Asymbol,"buyprice:",buyprice,"amount:",amount,caller=self)
+            self.oldsymbol = Asymbol
+            self.next_symbol = Bsymbol
+            self.act_revok = False
+            return

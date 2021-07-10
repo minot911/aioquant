@@ -25,7 +25,7 @@ class MyStrategy:
         self.account = config.accounts[0]["account"]
         self.access_key = config.accounts[0]["access_key"]
         self.secret_key = config.accounts[0]["secret_key"]
-        self.symbol = "EOS/QC"
+        self.symbol = "RSR/USDT"
         self.passphrase = config.accounts[0]["passphrase"]
         self.order_id = None  # 创建订单的id
         self.create_order_price = "0.0"  # 创建订单的价格
@@ -62,7 +62,7 @@ class MyStrategy:
 
     @async_method_locker("MyStrategy.init_callback.locker")  
     async def on_init_callback(self, success: bool, **kwagrs):
-        _, error = await self.trader.revoke_order('') 
+       # _, error = await self.trader.revoke_order('') 
         logger.debug("inint err:", error, caller=self)  
     
     
@@ -81,8 +81,9 @@ class MyStrategy:
         if self.order_id:
              if float(self.create_order_price) > float(bid3_price) or float(self.create_order_price) < float(bid4_price):
                  return
-             logger.debug("revoke order:", self.order_id, caller=self)
+             
              _, error = await self.trader.revoke_order(self.order_id)
+             logger.debug("revoke order:", self.order_id, "error",error,caller=self)
              if error:
 
                  logger.error("revoke order error! error:", error, caller=self)
@@ -91,9 +92,10 @@ class MyStrategy:
         else:
             # # 创建新订单
             price = (float(bid3_price) + float(bid4_price)) /2.0
-            quantity = "1.5"  # 假设委托数量为0.1
+            quantity = "1500"  # 假设委托数量为0.1
             action = ORDER_ACTION_BUY     
-            order_id, error = await self.trader.create_order(action, price, quantity)            
+            order_id, error = await self.trader.create_order(action, price, quantity)   
+            logger.debug("create order order_id:", order_id, caller=self)         
             if error:
                 logger.error("create order error! error:", error, caller=self)
                 return
@@ -102,7 +104,7 @@ class MyStrategy:
     async def on_event_order_update(self, order: Order):
         """ 订单状态更新
         """
-        #logger.debug("order id:", self.order_id, caller=self)
+        logger.debug("order id:", order, caller=self)
         if order.order_id == self.order_id:
             logger.debug("order update:", order, caller=self)
             if order.status in [ORDER_STATUS_FAILED, ORDER_STATUS_CANCELED, ORDER_STATUS_FILLED]:
@@ -117,9 +119,7 @@ class MyStrategy:
         logger.debug("order error:", error, caller=self)
 
     async def on_asset_update_callback(self, info, **kwagrs):        
-        ques,base = self.symbol.split("/")
-        if info["showName"] == ques or info["showName"] == base:
-            logger.debug("asset info:", info, caller=self)
+        ques,base = self.symbol.split("/")        
     @async_method_locker("MyStrategy.market_init_callback.locker")  
     async def on_market_init_callback(self, success: bool, **kwagrs): 
         logger.debug("inint market:", success, caller=self)  
